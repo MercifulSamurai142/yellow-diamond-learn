@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import Header from "@/components/layout/Header";
@@ -14,6 +13,15 @@ import { Tables } from "@/integrations/supabase/types";
 type Quiz = Tables<"quizzes">;
 type Question = Tables<"questions"> & { answers: Answer[] };
 type Answer = Tables<"answers">;
+
+interface QuizResult {
+  user_id: string;
+  quiz_id: string;
+  lesson_id?: string;
+  score: number;
+  passed: boolean;
+  answers_json: string;
+}
 
 const Quiz = () => {
   const { moduleId, lessonId } = useParams<{ moduleId: string; lessonId: string }>();
@@ -33,7 +41,6 @@ const Quiz = () => {
         setIsLoading(true);
         if (!lessonId) return;
         
-        // Fetch quiz details
         const { data: quizData, error: quizError } = await supabase
           .from('quizzes')
           .select('*')
@@ -44,7 +51,6 @@ const Quiz = () => {
         
         setQuiz(quizData);
 
-        // Fetch questions
         const { data: questionsData, error: questionsError } = await supabase
           .from('questions')
           .select('*')
@@ -55,7 +61,6 @@ const Quiz = () => {
         
         const questionIds = questionsData.map(q => q.id);
         
-        // Fetch answers for all questions
         const { data: answersData, error: answersError } = await supabase
           .from('answers')
           .select('*')
@@ -64,7 +69,6 @@ const Quiz = () => {
 
         if (answersError) throw answersError;
         
-        // Group answers by question_id
         const answersMap: Record<string, Answer[]> = {};
         answersData.forEach((answer) => {
           if (!answersMap[answer.question_id as string]) {
@@ -73,7 +77,6 @@ const Quiz = () => {
           answersMap[answer.question_id as string].push(answer as Answer);
         });
         
-        // Combine questions with their answers
         const questionsWithAnswers = questionsData.map(question => ({
           ...question,
           answers: answersMap[question.id] || []
@@ -117,7 +120,6 @@ const Quiz = () => {
   const handleSubmitQuiz = async () => {
     if (!user || !quiz) return;
     
-    // Count correct answers
     let correctCount = 0;
     
     questions.forEach(question => {
@@ -144,22 +146,29 @@ const Quiz = () => {
     setQuizCompleted(true);
     
     try {
-      // Check if quiz_results table exists, if not, create it
-      // Save quiz result
-      const { error } = await supabase
-        .from('quiz_results')
-        .insert({
-          user_id: user.id,
-          quiz_id: quiz.id,
-          lesson_id: lessonId,
-          score: percentageScore,
-          passed: percentageScore >= quiz.pass_threshold,
-          answers_json: JSON.stringify(selectedAnswers)
-        });
+      const { error } = await supabase.rpc('save_quiz_result', {
+        user_id_param: user.id,
+        quiz_id_param: quiz.id,
+        lesson_id_param: lessonId,
+        score_param: percentageScore,
+        passed_param: percentageScore >= quiz.pass_threshold,
+        answers_json_param: JSON.stringify(selectedAnswers)
+      });
 
       if (error) {
         console.error("Error saving quiz results:", error);
-        // Continue with the flow even if saving fails
+        try {
+          await supabase.rpc('insert_quiz_result', {
+            user_id_input: user.id,
+            quiz_id_input: quiz.id,
+            lesson_id_input: lessonId,
+            score_input: percentageScore,
+            passed_input: percentageScore >= quiz.pass_threshold,
+            answers_json_input: JSON.stringify(selectedAnswers)
+          });
+        } catch (fallbackErr) {
+          console.error("Fallback error saving quiz results:", fallbackErr);
+        }
       }
     } catch (err) {
       console.error("Error in quiz submission:", err);

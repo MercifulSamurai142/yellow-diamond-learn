@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { YDCard } from "@/components/ui/YDCard";
 import YDButton from "@/components/ui/YDButton";
@@ -10,6 +9,45 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Pencil, Trash2, Plus, Award } from "lucide-react";
 import { Achievement } from "@/pages/Admin";
+import { Json } from "@/integrations/supabase/types";
+
+interface LessonsPerDayCriteria {
+  type: "lessons_per_day";
+  count: number;
+}
+
+interface CompleteModuleCriteria {
+  type: "complete_module";
+}
+
+interface QuizScoreCriteria {
+  type: "quiz_score";
+  score: number;
+}
+
+interface ModuleAverageCriteria {
+  type: "module_average";
+  score: number;
+}
+
+interface StreakCriteria {
+  type: "streak";
+  days: number;
+}
+
+interface ModuleScoreCriteria {
+  type: "module_score";
+  module: string;
+  score: number;
+}
+
+type AchievementCriteria = 
+  | LessonsPerDayCriteria 
+  | CompleteModuleCriteria 
+  | QuizScoreCriteria 
+  | ModuleAverageCriteria 
+  | StreakCriteria 
+  | ModuleScoreCriteria;
 
 interface AchievementManagerProps {
   achievements: Achievement[];
@@ -23,7 +61,7 @@ const AchievementManager = ({ achievements, onAchievementsUpdate, refreshData }:
   const [newAchievement, setNewAchievement] = useState({
     name: "",
     description: "",
-    criteria_type: "lessons_per_day", // Default criteria type
+    criteria_type: "lessons_per_day" as const,
     criteria_count: 5,
     criteria_score: 80,
     criteria_module: "",
@@ -39,7 +77,7 @@ const AchievementManager = ({ achievements, onAchievementsUpdate, refreshData }:
     { value: "module_score", label: "Score in a specific module" }
   ];
 
-  const buildCriteriaJson = () => {
+  const buildCriteriaJson = (): AchievementCriteria => {
     switch (newAchievement.criteria_type) {
       case "lessons_per_day":
         return { type: "lessons_per_day", count: newAchievement.criteria_count };
@@ -62,17 +100,42 @@ const AchievementManager = ({ achievements, onAchievementsUpdate, refreshData }:
     }
   };
 
-  const parseCriteriaJson = (criteria: any) => {
+  const parseCriteriaJson = (criteria: Json | null) => {
     if (!criteria) return;
     
-    setNewAchievement(prev => ({
-      ...prev,
-      criteria_type: criteria.type || "lessons_per_day",
-      criteria_count: criteria.count || 5,
-      criteria_score: criteria.score || 80,
-      criteria_module: criteria.module || "",
-      criteria_days: criteria.days || 5
-    }));
+    try {
+      if (
+        typeof criteria === 'object' && 
+        criteria !== null && 
+        !Array.isArray(criteria) && 
+        'type' in criteria && 
+        typeof criteria.type === 'string'
+      ) {
+        setNewAchievement(prev => {
+          const newState = { ...prev, criteria_type: criteria.type as string };
+          
+          if ('count' in criteria && typeof criteria.count === 'number') {
+            newState.criteria_count = criteria.count;
+          }
+          
+          if ('score' in criteria && typeof criteria.score === 'number') {
+            newState.criteria_score = criteria.score;
+          }
+          
+          if ('module' in criteria && typeof criteria.module === 'string') {
+            newState.criteria_module = criteria.module;
+          }
+          
+          if ('days' in criteria && typeof criteria.days === 'number') {
+            newState.criteria_days = criteria.days;
+          }
+          
+          return newState;
+        });
+      }
+    } catch (error) {
+      console.error("Error parsing criteria JSON:", error);
+    }
   };
 
   const handleAddAchievement = async () => {
@@ -103,12 +166,10 @@ const AchievementManager = ({ achievements, onAchievementsUpdate, refreshData }:
         description: "Achievement added successfully",
       });
 
-      // Update local state
       if (data) {
         onAchievementsUpdate([...achievements, data[0]]);
       }
 
-      // Reset form
       resetForm();
       await refreshData();
     } catch (error) {
@@ -136,7 +197,6 @@ const AchievementManager = ({ achievements, onAchievementsUpdate, refreshData }:
       criteria_days: 5
     });
     
-    // Parse criteria JSON
     parseCriteriaJson(achievementToEdit.criteria);
     setIsAddingAchievement(true);
   };
@@ -171,7 +231,6 @@ const AchievementManager = ({ achievements, onAchievementsUpdate, refreshData }:
         description: "Achievement updated successfully",
       });
 
-      // Update local state
       const updatedAchievements = achievements.map(achievement => {
         if (achievement.id === editingAchievementId) {
           return {
@@ -185,7 +244,6 @@ const AchievementManager = ({ achievements, onAchievementsUpdate, refreshData }:
       });
       onAchievementsUpdate(updatedAchievements);
 
-      // Reset form
       resetForm();
       await refreshData();
     } catch (error) {
@@ -212,7 +270,6 @@ const AchievementManager = ({ achievements, onAchievementsUpdate, refreshData }:
         description: "Achievement deleted successfully",
       });
 
-      // Update local state
       onAchievementsUpdate(achievements.filter(achievement => achievement.id !== achievementId));
       await refreshData();
     } catch (error) {
@@ -237,6 +294,38 @@ const AchievementManager = ({ achievements, onAchievementsUpdate, refreshData }:
       criteria_module: "",
       criteria_days: 5
     });
+  };
+
+  const renderCriteriaDescription = (criteria: Json): React.ReactNode => {
+    try {
+      if (typeof criteria !== 'object' || criteria === null || Array.isArray(criteria)) {
+        return "Invalid criteria format";
+      }
+      
+      if (!('type' in criteria) || typeof criteria.type !== 'string') {
+        return "Unknown criteria type";
+      }
+
+      switch (criteria.type) {
+        case 'lessons_per_day': 
+          return `Complete ${('count' in criteria && typeof criteria.count === 'number') ? criteria.count : '?'} lessons in a day`;
+        case 'complete_module': 
+          return 'Complete a full module';
+        case 'quiz_score': 
+          return `Get a ${('score' in criteria && typeof criteria.score === 'number') ? criteria.score : '?'}% score on a quiz`;
+        case 'module_average': 
+          return `Average ${('score' in criteria && typeof criteria.score === 'number') ? criteria.score : '?'}% score across all modules`;
+        case 'streak': 
+          return `Login and complete lessons for ${('days' in criteria && typeof criteria.days === 'number') ? criteria.days : '?'} consecutive days`;
+        case 'module_score': 
+          return `Get ${('score' in criteria && typeof criteria.score === 'number') ? criteria.score : '?'}% in the ${('module' in criteria && typeof criteria.module === 'string') ? criteria.module : '?'} module`;
+        default:
+          return "Unknown criteria type";
+      }
+    } catch (error) {
+      console.error("Error rendering criteria description:", error);
+      return "Error displaying criteria";
+    }
   };
 
   return (
@@ -296,7 +385,6 @@ const AchievementManager = ({ achievements, onAchievementsUpdate, refreshData }:
               </Select>
             </div>
             
-            {/* Dynamic fields based on criteria type */}
             {newAchievement.criteria_type === "lessons_per_day" && (
               <div>
                 <Label htmlFor="criteriaCount">Number of Lessons</Label>
@@ -383,18 +471,7 @@ const AchievementManager = ({ achievements, onAchievementsUpdate, refreshData }:
                     <p className="text-muted-foreground mt-1">{achievement.description}</p>
                     <div className="mt-2 text-sm text-muted-foreground">
                       <strong>Criteria: </strong>
-                      {achievement.criteria && achievement.criteria.type === 'lessons_per_day' && 
-                        `Complete ${achievement.criteria.count} lessons in a day`}
-                      {achievement.criteria && achievement.criteria.type === 'complete_module' && 
-                        `Complete a full module`}
-                      {achievement.criteria && achievement.criteria.type === 'quiz_score' && 
-                        `Get a ${achievement.criteria.score}% score on a quiz`}
-                      {achievement.criteria && achievement.criteria.type === 'module_average' && 
-                        `Average ${achievement.criteria.score}% score across all modules`}
-                      {achievement.criteria && achievement.criteria.type === 'streak' && 
-                        `Login and complete lessons for ${achievement.criteria.days} consecutive days`}
-                      {achievement.criteria && achievement.criteria.type === 'module_score' && 
-                        `Get ${achievement.criteria.score}% in the ${achievement.criteria.module} module`}
+                      {renderCriteriaDescription(achievement.criteria)}
                     </div>
                   </div>
                 </div>
