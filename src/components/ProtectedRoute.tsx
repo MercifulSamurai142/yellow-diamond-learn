@@ -2,6 +2,7 @@
 import { useEffect } from "react";
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
+import { useProfile } from "@/hooks/useProfile";
 
 type ProtectedRouteProps = {
   children: React.ReactNode;
@@ -9,13 +10,17 @@ type ProtectedRouteProps = {
 };
 
 const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
-  const { user, isLoading } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
+  const { profile, isLoading: profileLoading } = useProfile();
   const location = useLocation();
+  
+  const isLoading = authLoading || profileLoading;
 
   useEffect(() => {
-    // You can add role-based protection here when implementing role management
-    // For now, we're just checking if the user is authenticated
-  }, [user]);
+    if (requiredRole && profile && profile.role !== requiredRole) {
+      console.log(`User does not have required role: ${requiredRole}`);
+    }
+  }, [user, profile, requiredRole]);
 
   if (isLoading) {
     return (
@@ -30,8 +35,10 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
-  // If requireRole is specified, check user's role (to be implemented)
-  // For now, we're just checking if the user is authenticated
+  // If requiredRole is specified, check user's role
+  if (requiredRole && profile && profile.role !== requiredRole) {
+    return <Navigate to="/dashboard" replace />;
+  }
 
   return <>{children}</>;
 };

@@ -5,7 +5,7 @@ import Header from "@/components/layout/Header";
 import Sidebar from "@/components/layout/Sidebar";
 import YDButton from "@/components/ui/YDButton";
 import { YDCard } from "@/components/ui/YDCard";
-import { useProfile } from "@/hooks/useProfile";
+import { useProfile, UserProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 
@@ -112,6 +112,12 @@ const Profile = () => {
     );
   }
 
+  // Get initials from name for the avatar
+  const getInitials = () => {
+    if (!profile?.name) return user?.email?.[0].toUpperCase() || 'U';
+    return profile.name.split(' ').map(n => n[0]).join('').toUpperCase();
+  };
+
   return (
     <div className="flex h-screen bg-background">
       <Sidebar />
@@ -136,7 +142,7 @@ const Profile = () => {
                       />
                     ) : (
                       <div className="w-full h-full rounded-full bg-yd-navy flex items-center justify-center text-white text-4xl font-medium">
-                        {profile?.name?.split(' ').map(n => n[0]).join('') || user?.email?.[0].toUpperCase() || 'U'}
+                        {getInitials()}
                       </div>
                     )}
                     <button className="absolute bottom-0 right-0 bg-primary text-white p-2 rounded-full hover:bg-primary/90">
@@ -158,7 +164,11 @@ const Profile = () => {
                     </div>
                     <div className="flex justify-between text-sm py-2">
                       <span className="text-muted-foreground">Joined</span>
-                      <span>{profile?.created_at ? new Date(profile.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) : 'Recent'}</span>
+                      <span>
+                        {profile?.created_at 
+                          ? new Date(profile.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' }) 
+                          : 'Recent'}
+                      </span>
                     </div>
                   </div>
                 </YDCard>

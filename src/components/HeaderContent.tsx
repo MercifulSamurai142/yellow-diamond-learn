@@ -11,6 +11,12 @@ const HeaderContent = () => {
     await signOut();
   };
 
+  // Extract initials from name for the avatar
+  const getInitials = () => {
+    if (!profile?.name) return 'U';
+    return profile.name.substring(0, 2).toUpperCase();
+  };
+
   return (
     <div className="flex items-center gap-4">
       {/* Notifications */}
@@ -30,7 +36,7 @@ const HeaderContent = () => {
         
         {/* User Avatar - can use profile picture if available */}
         <div className="h-9 w-9 rounded-full bg-yd-navy text-white flex items-center justify-center text-sm font-medium">
-          {profile?.name ? profile.name.substring(0, 2).toUpperCase() : 'U'}
+          {getInitials()}
         </div>
 
         {/* Logout button */}

@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { Tables } from '@/integrations/supabase/types';
 
-export type UserProfile = Tables<'users'>;
+export type UserProfile = Tables<"users">;
 
 export const useProfile = () => {
   const { user } = useAuth();
@@ -30,7 +30,7 @@ export const useProfile = () => {
 
         if (error) throw error;
         
-        setProfile(data);
+        setProfile(data as UserProfile);
       } catch (err) {
         console.error('Error fetching profile:', err);
         setError(err instanceof Error ? err : new Error('Unknown error occurred'));
@@ -55,7 +55,7 @@ export const useProfile = () => {
         
       if (error) throw error;
       
-      setProfile(data);
+      setProfile(data as UserProfile);
       return { data, error: null };
     } catch (error) {
       console.error('Error updating profile:', error);
