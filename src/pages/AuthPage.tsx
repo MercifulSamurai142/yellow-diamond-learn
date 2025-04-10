@@ -1,19 +1,58 @@
 
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
 import { Eye, EyeOff } from "lucide-react";
 import YDButton from "@/components/ui/YDButton";
+import { useAuth } from "@/contexts/AuthContext";
+import { toast } from "@/hooks/use-toast";
+import { useNavigate, useLocation } from "react-router-dom";
 
 const AuthPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const { signIn, signUp } = useAuth();
   const [isLogin, setIsLogin] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
+  const [formData, setFormData] = useState({
+    email: "",
+    password: "",
+    name: "",
+  });
+  const [isLoading, setIsLoading] = useState(false);
   
-  // This is just for demo - we would connect to Supabase in the actual implementation
-  const handleSubmit = (e: React.FormEvent) => {
+  // Get the intended destination after login
+  const from = location.state?.from?.pathname || "/dashboard";
+  
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({ ...prev, [name]: value }));
+  };
+  
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // In a real implementation, we would authenticate with Supabase here
-    navigate("/dashboard");
+    setIsLoading(true);
+    
+    try {
+      if (isLogin) {
+        await signIn(formData.email, formData.password);
+        navigate(from, { replace: true });
+      } else {
+        if (!formData.name) {
+          toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Please enter your full name",
+          });
+          return;
+        }
+        await signUp(formData.email, formData.password, formData.name);
+        // Don't navigate - the user needs to verify their email first
+      }
+    } catch (error) {
+      console.error("Authentication error:", error);
+      // Error handling is done inside sign in/up functions
+    } finally {
+      setIsLoading(false);
+    }
   };
   
   const toggleAuthMode = () => {
@@ -62,6 +101,8 @@ const AuthPage = () => {
                   id="name"
                   name="name"
                   type="text"
+                  value={formData.name}
+                  onChange={handleChange}
                   required={!isLogin}
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   placeholder="John Doe"
@@ -77,6 +118,8 @@ const AuthPage = () => {
                 id="email"
                 name="email"
                 type="email"
+                value={formData.email}
+                onChange={handleChange}
                 required
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                 placeholder="john.doe@example.com"
@@ -92,6 +135,8 @@ const AuthPage = () => {
                   id="password"
                   name="password"
                   type={showPassword ? "text" : "password"}
+                  value={formData.password}
+                  onChange={handleChange}
                   required
                   className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                   placeholder="••••••••"
@@ -113,8 +158,8 @@ const AuthPage = () => {
               )}
             </div>
             
-            <YDButton type="submit" className="w-full">
-              {isLogin ? "Sign In" : "Create Account"}
+            <YDButton type="submit" className="w-full" disabled={isLoading}>
+              {isLoading ? 'Processing...' : isLogin ? "Sign In" : "Create Account"}
             </YDButton>
             
             <div className="text-center text-sm">
