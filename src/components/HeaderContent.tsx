@@ -13,7 +13,7 @@ const HeaderContent = () => {
 
   // Extract initials from name for the avatar
   const getInitials = () => {
-    if (!profile?.name) return 'U';
+    if (!profile || !profile.name) return 'U';
     return profile.name.substring(0, 2).toUpperCase();
   };
 

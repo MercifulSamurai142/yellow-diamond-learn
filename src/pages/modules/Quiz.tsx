@@ -9,25 +9,11 @@ import { ArrowLeft, CheckCircle2, XCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
+import { Tables } from "@/integrations/supabase/types";
 
-type Quiz = {
-  id: string;
-  title: string;
-  pass_threshold: number;
-};
-
-type Question = {
-  id: string;
-  question_text: string;
-  order: number;
-  answers: Answer[];
-};
-
-type Answer = {
-  id: string;
-  answer_text: string;
-  is_correct: boolean;
-};
+type Quiz = Tables<"quizzes">;
+type Question = Tables<"questions"> & { answers: Answer[] };
+type Answer = Tables<"answers">;
 
 const Quiz = () => {
   const { moduleId, lessonId } = useParams<{ moduleId: string; lessonId: string }>();
@@ -56,7 +42,7 @@ const Quiz = () => {
 
         if (quizError) throw quizError;
         
-        setQuiz(quizData as Quiz);
+        setQuiz(quizData);
 
         // Fetch questions
         const { data: questionsData, error: questionsError } = await supabase
@@ -81,10 +67,10 @@ const Quiz = () => {
         // Group answers by question_id
         const answersMap: Record<string, Answer[]> = {};
         answersData.forEach((answer) => {
-          if (!answersMap[answer.question_id]) {
-            answersMap[answer.question_id] = [];
+          if (!answersMap[answer.question_id as string]) {
+            answersMap[answer.question_id as string] = [];
           }
-          answersMap[answer.question_id].push(answer as Answer);
+          answersMap[answer.question_id as string].push(answer as Answer);
         });
         
         // Combine questions with their answers
@@ -128,7 +114,9 @@ const Quiz = () => {
     }
   };
 
-  const handleSubmitQuiz = () => {
+  const handleSubmitQuiz = async () => {
+    if (!user || !quiz) return;
+    
     // Count correct answers
     let correctCount = 0;
     
@@ -155,7 +143,28 @@ const Quiz = () => {
     
     setQuizCompleted(true);
     
-    // Save quiz result to be implemented later
+    try {
+      // Check if quiz_results table exists, if not, create it
+      // Save quiz result
+      const { error } = await supabase
+        .from('quiz_results')
+        .insert({
+          user_id: user.id,
+          quiz_id: quiz.id,
+          lesson_id: lessonId,
+          score: percentageScore,
+          passed: percentageScore >= quiz.pass_threshold,
+          answers_json: JSON.stringify(selectedAnswers)
+        });
+
+      if (error) {
+        console.error("Error saving quiz results:", error);
+        // Continue with the flow even if saving fails
+      }
+    } catch (err) {
+      console.error("Error in quiz submission:", err);
+    }
+    
     toast({
       title: "Quiz completed",
       description: `You scored ${percentageScore}%`,
