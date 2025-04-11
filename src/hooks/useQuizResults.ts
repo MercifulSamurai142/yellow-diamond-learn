@@ -4,7 +4,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 
-// Define a custom type for quiz results since it's not in the generated types
+// Define a custom type for quiz results since it's not being recognized in the generated types
 export interface QuizResult {
   id: string;
   user_id: string;
@@ -27,23 +27,23 @@ export const useQuizResults = (quizId?: string, lessonId?: string) => {
     setIsLoading(true);
     
     try {
-      // Use the raw query method to bypass the type checking for quiz_results
-      // since it's not in the auto-generated types
+      // Use the RPC function instead of direct table access
       const { data, error } = await supabase
-        .from('quiz_results')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('quiz_id', quizId)
-        .order('created_at', { ascending: false })
-        .limit(1)
-        .maybeSingle();
+        .rpc('get_user_quiz_results', { 
+          user_id_param: user.id, 
+          quiz_ids_param: [quizId]
+        });
       
       if (error) throw error;
       
-      // Explicitly cast the data to QuizResult
-      const typedData = data as unknown as QuizResult;
-      setResults(typedData);
-      return typedData;
+      // If we have results, get the most recent one
+      if (data && data.length > 0) {
+        const mostRecentResult = data[0] as unknown as QuizResult;
+        setResults(mostRecentResult);
+        return mostRecentResult;
+      }
+      
+      return null;
     } catch (error) {
       console.error('Error fetching quiz results:', error);
       toast({
@@ -70,26 +70,23 @@ export const useQuizResults = (quizId?: string, lessonId?: string) => {
     setIsLoading(true);
     
     try {
-      // Use the raw query method to bypass the type checking for quiz_results
+      // Use the RPC function instead of direct table access
       const { data, error } = await supabase
-        .from('quiz_results')
-        .insert({
-          user_id: user.id,
-          quiz_id: quizId,
-          lesson_id: lessonId,
-          score,
-          passed,
-          answers_json: answersJson
-        })
-        .select()
-        .single();
+        .rpc('save_quiz_result', {
+          user_id_param: user.id,
+          quiz_id_param: quizId,
+          lesson_id_param: lessonId,
+          score_param: score,
+          passed_param: passed,
+          answers_json_param: answersJson
+        });
       
       if (error) throw error;
       
-      // Explicitly cast the data to QuizResult
-      const typedData = data as unknown as QuizResult;
-      setResults(typedData);
-      return typedData;
+      // Since the function doesn't return the inserted record,
+      // we'll fetch the latest result after saving
+      const fetchResponse = await fetchResults();
+      return fetchResponse;
     } catch (error) {
       console.error('Error saving quiz result:', error);
       toast({
