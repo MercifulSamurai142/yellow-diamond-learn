@@ -100,11 +100,11 @@ const ProgressPage = () => {
             
             if (quizIds.length > 0) {
               try {
-                // Now get quiz results using a raw query to work around the missing type
+                // Get quiz results using stored procedure
                 const { data: quizResults, error: quizResultsError } = await supabase
                   .rpc('get_user_quiz_results', { 
                     user_id_param: user.id,
-                    quiz_ids_param: quizIds
+                    quiz_ids_param: quizIds as unknown as string[]
                   });
                 
                 if (quizResultsError) {

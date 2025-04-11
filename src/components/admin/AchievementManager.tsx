@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { YDCard } from "@/components/ui/YDCard";
 import YDButton from "@/components/ui/YDButton";
@@ -10,6 +11,15 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Pencil, Trash2, Plus, Award } from "lucide-react";
 import { Achievement } from "@/pages/Admin";
 import { Json } from "@/integrations/supabase/types";
+
+// Define achievement criteria types with a union type
+type CriteriaType = 
+  | "lessons_per_day" 
+  | "complete_module" 
+  | "quiz_score" 
+  | "module_average" 
+  | "streak" 
+  | "module_score";
 
 interface LessonsPerDayCriteria {
   type: "lessons_per_day";
@@ -55,13 +65,23 @@ interface AchievementManagerProps {
   refreshData: () => Promise<void>;
 }
 
+interface NewAchievement {
+  name: string;
+  description: string;
+  criteria_type: CriteriaType;
+  criteria_count: number;
+  criteria_score: number;
+  criteria_module: string;
+  criteria_days: number;
+}
+
 const AchievementManager = ({ achievements, onAchievementsUpdate, refreshData }: AchievementManagerProps) => {
   const [isAddingAchievement, setIsAddingAchievement] = useState(false);
   const [editingAchievementId, setEditingAchievementId] = useState<string | null>(null);
-  const [newAchievement, setNewAchievement] = useState({
+  const [newAchievement, setNewAchievement] = useState<NewAchievement>({
     name: "",
     description: "",
-    criteria_type: "lessons_per_day" as const,
+    criteria_type: "lessons_per_day",
     criteria_count: 5,
     criteria_score: 80,
     criteria_module: "",
@@ -75,7 +95,7 @@ const AchievementManager = ({ achievements, onAchievementsUpdate, refreshData }:
     { value: "module_average", label: "Average score across all modules" },
     { value: "streak", label: "Login streak for consecutive days" },
     { value: "module_score", label: "Score in a specific module" }
-  ];
+  ] as const;
 
   const buildCriteriaJson = (): AchievementCriteria => {
     switch (newAchievement.criteria_type) {
@@ -95,8 +115,6 @@ const AchievementManager = ({ achievements, onAchievementsUpdate, refreshData }:
           module: newAchievement.criteria_module,
           score: newAchievement.criteria_score
         };
-      default:
-        return { type: "lessons_per_day", count: 5 };
     }
   };
 
@@ -104,6 +122,7 @@ const AchievementManager = ({ achievements, onAchievementsUpdate, refreshData }:
     if (!criteria) return;
     
     try {
+      // Type guard to check if criteria is an object with a type property
       if (
         typeof criteria === 'object' && 
         criteria !== null && 
@@ -111,8 +130,10 @@ const AchievementManager = ({ achievements, onAchievementsUpdate, refreshData }:
         'type' in criteria && 
         typeof criteria.type === 'string'
       ) {
+        const criteriaType = criteria.type as CriteriaType;
+        
         setNewAchievement(prev => {
-          const newState = { ...prev, criteria_type: criteria.type as string };
+          const newState = { ...prev, criteria_type: criteriaType };
           
           if ('count' in criteria && typeof criteria.count === 'number') {
             newState.criteria_count = criteria.count;
@@ -155,7 +176,7 @@ const AchievementManager = ({ achievements, onAchievementsUpdate, refreshData }:
         .insert({
           name: newAchievement.name,
           description: newAchievement.description,
-          criteria: criteriaJson
+          criteria: criteriaJson as unknown as Json
         })
         .select();
 
@@ -220,7 +241,7 @@ const AchievementManager = ({ achievements, onAchievementsUpdate, refreshData }:
         .update({
           name: newAchievement.name,
           description: newAchievement.description,
-          criteria: criteriaJson
+          criteria: criteriaJson as unknown as Json
         })
         .eq("id", editingAchievementId);
 
@@ -237,7 +258,7 @@ const AchievementManager = ({ achievements, onAchievementsUpdate, refreshData }:
             ...achievement,
             name: newAchievement.name,
             description: newAchievement.description,
-            criteria: criteriaJson
+            criteria: criteriaJson as unknown as Json
           };
         }
         return achievement;
@@ -370,7 +391,7 @@ const AchievementManager = ({ achievements, onAchievementsUpdate, refreshData }:
               <Label htmlFor="criteriaType">Criteria Type</Label>
               <Select
                 value={newAchievement.criteria_type}
-                onValueChange={(value) => setNewAchievement({ ...newAchievement, criteria_type: value })}
+                onValueChange={(value: CriteriaType) => setNewAchievement({ ...newAchievement, criteria_type: value })}
               >
                 <SelectTrigger>
                   <SelectValue placeholder="Select criteria type" />
@@ -398,7 +419,9 @@ const AchievementManager = ({ achievements, onAchievementsUpdate, refreshData }:
               </div>
             )}
             
-            {["quiz_score", "module_average", "module_score"].includes(newAchievement.criteria_type) && (
+            {(newAchievement.criteria_type === "quiz_score" || 
+              newAchievement.criteria_type === "module_average" || 
+              newAchievement.criteria_type === "module_score") && (
               <div>
                 <Label htmlFor="criteriaScore">Required Score (%)</Label>
                 <Input
