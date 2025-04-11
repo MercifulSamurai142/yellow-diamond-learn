@@ -27,7 +27,8 @@ export const useQuizResults = (quizId?: string, lessonId?: string) => {
     setIsLoading(true);
     
     try {
-      // Use custom typing for the response
+      // Use the raw query method to bypass the type checking for quiz_results
+      // since it's not in the auto-generated types
       const { data, error } = await supabase
         .from('quiz_results')
         .select('*')
@@ -38,8 +39,11 @@ export const useQuizResults = (quizId?: string, lessonId?: string) => {
         .maybeSingle();
       
       if (error) throw error;
-      setResults(data as QuizResult);
-      return data as QuizResult;
+      
+      // Explicitly cast the data to QuizResult
+      const typedData = data as unknown as QuizResult;
+      setResults(typedData);
+      return typedData;
     } catch (error) {
       console.error('Error fetching quiz results:', error);
       toast({
@@ -66,7 +70,7 @@ export const useQuizResults = (quizId?: string, lessonId?: string) => {
     setIsLoading(true);
     
     try {
-      // Use custom typing for the response
+      // Use the raw query method to bypass the type checking for quiz_results
       const { data, error } = await supabase
         .from('quiz_results')
         .insert({
@@ -82,8 +86,10 @@ export const useQuizResults = (quizId?: string, lessonId?: string) => {
       
       if (error) throw error;
       
-      setResults(data as QuizResult);
-      return data as QuizResult;
+      // Explicitly cast the data to QuizResult
+      const typedData = data as unknown as QuizResult;
+      setResults(typedData);
+      return typedData;
     } catch (error) {
       console.error('Error saving quiz result:', error);
       toast({
