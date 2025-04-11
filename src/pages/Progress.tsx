@@ -103,23 +103,24 @@ const ProgressPage = () => {
             
             if (quizIds.length > 0) {
               try {
-                // Get quiz results using stored procedure
-                const { data: quizResults, error: quizResultsError } = await supabase
-                  .rpc('get_user_quiz_results', { 
-                    user_id_param: user.id,
-                    quiz_ids_param: quizIds
-                  }) as { data: QuizResult[] | null, error: any };
+                // Use a custom fetch approach instead of direct table access
+                const { data, error } = await supabase.functions.invoke('get-quiz-results', {
+                  body: JSON.stringify({
+                    userId: user.id,
+                    quizIds: quizIds
+                  })
+                });
                 
-                if (quizResultsError) {
-                  console.error("Error fetching quiz results:", quizResultsError);
+                if (error) {
+                  console.error("Error fetching quiz results:", error);
                   // Fall back to mock data if there's an error
                   quizScore = module.name === 'FMCG Fundamentals' ? 90 : 
                               module.name === 'Sales Finance & Trade Marketing' ? 75 : 
                               module.name === 'Digital Transformation in Sales' ? 80 : null;
-                } else if (quizResults && quizResults.length > 0) {
+                } else if (data && Array.isArray(data) && data.length > 0) {
                   // Use the average score for all quizzes in the module
-                  const totalScore = quizResults.reduce((sum: number, result: QuizResult) => sum + result.score, 0);
-                  quizScore = Math.round(totalScore / quizResults.length);
+                  const totalScore = data.reduce((sum, result) => sum + (result.score || 0), 0);
+                  quizScore = Math.round(totalScore / data.length);
                 }
               } catch (error) {
                 console.error("Error processing quiz results:", error);

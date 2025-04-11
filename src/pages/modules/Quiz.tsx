@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import Header from "@/components/layout/Header";
@@ -147,31 +146,19 @@ const Quiz = () => {
     setQuizCompleted(true);
     
     try {
-      // Use RPC function to save quiz result
-      const { error } = await supabase.rpc('save_quiz_result', {
-        user_id_param: user.id,
-        quiz_id_param: quiz.id,
-        lesson_id_param: lessonId,
-        score_param: percentageScore,
-        passed_param: percentageScore >= quiz.pass_threshold,
-        answers_json_param: JSON.stringify(selectedAnswers)
+      const { data, error } = await supabase.functions.invoke('save-quiz-result', {
+        body: JSON.stringify({
+          userId: user.id,
+          quizId: quiz.id,
+          lessonId: lessonId,
+          score: percentageScore,
+          passed: percentageScore >= quiz.pass_threshold,
+          answersJson: JSON.stringify(selectedAnswers)
+        })
       });
 
       if (error) {
         console.error("Error saving quiz results:", error);
-        try {
-          // Fallback to another RPC function
-          await supabase.rpc('insert_quiz_result', {
-            user_id_input: user.id,
-            quiz_id_input: quiz.id,
-            lesson_id_input: lessonId,
-            score_input: percentageScore,
-            passed_input: percentageScore >= quiz.pass_threshold,
-            answers_json_input: JSON.stringify(selectedAnswers)
-          });
-        } catch (fallbackErr) {
-          console.error("Fallback error saving quiz results:", fallbackErr);
-        }
       }
     } catch (err) {
       console.error("Error in quiz submission:", err);
