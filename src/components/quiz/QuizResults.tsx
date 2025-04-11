@@ -1,50 +1,53 @@
 
-import { YDCard } from "@/components/ui/YDCard";
+import { CheckCircle, XCircle, RefreshCw } from "lucide-react";
 import YDButton from "@/components/ui/YDButton";
-import { CheckCircle2, XCircle } from "lucide-react";
+import { QuizSubmissionResult } from "@/hooks/useQuizSubmission";
+import { Link } from "react-router-dom";
 
 interface QuizResultsProps {
-  score: {
-    correct: number;
-    total: number;
-    percentage: number;
-  };
-  passThreshold: number;
-  onReturnToModules: () => void;
+  result: QuizSubmissionResult;
+  onReset: () => void;
+  moduleId: string;
+  lessonId: string;
 }
 
-const QuizResults = ({ score, passThreshold, onReturnToModules }: QuizResultsProps) => {
+const QuizResults = ({ result, onReset, moduleId, lessonId }: QuizResultsProps) => {
+  const { score, passed, totalQuestions, correctAnswers, incorrectAnswers } = result;
+  
   return (
-    <>
-      <h2 className="yd-section-title mb-6">Quiz Results</h2>
-      
-      <YDCard className="mb-8">
-        <div className="p-6 text-center">
-          <div className="mb-6">
-            <h3 className="text-2xl font-bold mb-2">{score.percentage}%</h3>
-            <p className="text-muted-foreground">
-              You answered {score.correct} out of {score.total} questions correctly
-            </p>
-          </div>
-          
-          {score.percentage >= passThreshold ? (
-            <div className="flex items-center justify-center text-green-600 mb-6">
-              <CheckCircle2 size={24} className="mr-2" />
-              <span className="text-lg font-medium">Passed!</span>
-            </div>
-          ) : (
-            <div className="flex items-center justify-center text-red-600 mb-6">
-              <XCircle size={24} className="mr-2" />
-              <span className="text-lg font-medium">Failed</span>
-            </div>
-          )}
-          
-          <YDButton onClick={onReturnToModules}>
-            Return to Modules
-          </YDButton>
+    <div className="bg-white rounded-lg shadow-sm border p-6 animate-fade-in">
+      <div className="text-center mb-8">
+        <div className={`text-3xl font-bold mb-2 ${passed ? "text-green-500" : "text-red-500"}`}>
+          {passed ? "Quiz Passed!" : "Quiz Failed"}
         </div>
-      </YDCard>
-    </>
+        <div className="text-xl mb-4">Your score: {score}%</div>
+        
+        <div className="flex justify-center space-x-4 text-sm text-gray-600">
+          <div className="flex items-center">
+            <CheckCircle className="text-green-500 mr-1" size={16} />
+            <span>Correct: {correctAnswers}</span>
+          </div>
+          <div className="flex items-center">
+            <XCircle className="text-red-500 mr-1" size={16} />
+            <span>Incorrect: {incorrectAnswers}</span>
+          </div>
+          <div>Total: {totalQuestions} questions</div>
+        </div>
+      </div>
+      
+      <div className="flex justify-center space-x-4">
+        <YDButton onClick={onReset} variant="outline">
+          <RefreshCw size={16} className="mr-2" />
+          Try Again
+        </YDButton>
+        
+        <Link to={`/modules/${moduleId}/lessons/${lessonId}`}>
+          <YDButton>
+            {passed ? "Back to Lesson" : "Review Lesson"}
+          </YDButton>
+        </Link>
+      </div>
+    </div>
   );
 };
 
