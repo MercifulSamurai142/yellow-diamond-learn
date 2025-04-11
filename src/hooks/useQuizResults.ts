@@ -3,9 +3,18 @@ import { useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
-import { Tables } from '@/integrations/supabase/types';
 
-export type QuizResult = Tables<"quiz_results">;
+// Define a custom type for quiz results since it's not in the generated types
+export interface QuizResult {
+  id: string;
+  user_id: string;
+  quiz_id: string;
+  lesson_id: string;
+  score: number;
+  passed: boolean;
+  answers_json: any;
+  created_at: string;
+}
 
 export const useQuizResults = (quizId?: string, lessonId?: string) => {
   const { user } = useAuth();
@@ -18,6 +27,7 @@ export const useQuizResults = (quizId?: string, lessonId?: string) => {
     setIsLoading(true);
     
     try {
+      // Use custom typing for the response
       const { data, error } = await supabase
         .from('quiz_results')
         .select('*')
@@ -28,8 +38,8 @@ export const useQuizResults = (quizId?: string, lessonId?: string) => {
         .maybeSingle();
       
       if (error) throw error;
-      setResults(data);
-      return data;
+      setResults(data as QuizResult);
+      return data as QuizResult;
     } catch (error) {
       console.error('Error fetching quiz results:', error);
       toast({
@@ -56,6 +66,7 @@ export const useQuizResults = (quizId?: string, lessonId?: string) => {
     setIsLoading(true);
     
     try {
+      // Use custom typing for the response
       const { data, error } = await supabase
         .from('quiz_results')
         .insert({
@@ -72,7 +83,7 @@ export const useQuizResults = (quizId?: string, lessonId?: string) => {
       if (error) throw error;
       
       setResults(data as QuizResult);
-      return data;
+      return data as QuizResult;
     } catch (error) {
       console.error('Error saving quiz result:', error);
       toast({

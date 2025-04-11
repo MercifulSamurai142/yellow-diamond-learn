@@ -5,9 +5,9 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { Tables } from "@/integrations/supabase/types";
 
-type Quiz = Tables<"quizzes">;
-type Question = Tables<"questions"> & { answers: Answer[] };
-type Answer = Tables<"answers">;
+export type Quiz = Tables<"quizzes">;
+export type Question = Tables<"questions"> & { answers: Answer[] };
+export type Answer = Tables<"answers">;
 
 interface UseQuizProps {
   lessonId: string | undefined;

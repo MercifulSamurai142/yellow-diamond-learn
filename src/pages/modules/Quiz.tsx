@@ -24,16 +24,18 @@ const Quiz = () => {
 
   // Quiz submission logic
   const { 
-    selectedAnswers,
-    quizCompleted,
-    score,
-    handleAnswerSelect,
-    submitQuiz
-  } = useQuizSubmission({
-    questions,
-    quiz,
-    lessonId
-  });
+    userAnswers,
+    result,
+    isSubmitting,
+    handleAnswerChange,
+    submitQuiz,
+    resetQuiz
+  } = useQuizSubmission(
+    questions, 
+    quiz?.pass_threshold || 70, 
+    quiz?.id || '', 
+    lessonId || ''
+  );
 
   // Navigation handlers
   const handleNextQuestion = () => {
@@ -64,7 +66,14 @@ const Quiz = () => {
             <div className="yd-container animate-fade-in">
               {!quiz || questions.length === 0 ? (
                 <QuizNotFound moduleId={moduleId!} lessonId={lessonId!} />
-              ) : !quizCompleted ? (
+              ) : result ? (
+                <QuizResults 
+                  result={result}
+                  onReset={resetQuiz}
+                  moduleId={moduleId!}
+                  lessonId={lessonId!}
+                />
+              ) : (
                 <>
                   <QuizHeader 
                     moduleId={moduleId!} 
@@ -78,26 +87,24 @@ const Quiz = () => {
                   {questions.length > 0 && (
                     <QuizQuestion 
                       question={questions[currentQuestion]}
-                      selectedAnswer={selectedAnswers[questions[currentQuestion].id]}
-                      onAnswerSelect={handleAnswerSelect}
+                      selectedAnswer={
+                        userAnswers.find(a => a.questionId === questions[currentQuestion].id)?.answerId
+                      }
+                      onAnswerSelect={handleAnswerChange}
                     />
                   )}
                   
                   <QuizNavigation 
                     currentQuestion={currentQuestion}
                     totalQuestions={questions.length}
-                    selectedAnswer={selectedAnswers[questions[currentQuestion].id]}
+                    selectedAnswer={
+                      userAnswers.find(a => a.questionId === questions[currentQuestion].id)?.answerId
+                    }
                     onPrevious={handlePrevQuestion}
                     onNext={handleNextQuestion}
                     onSubmit={submitQuiz}
                   />
                 </>
-              ) : (
-                <QuizResults 
-                  score={score}
-                  passThreshold={quiz.pass_threshold}
-                  onReturnToModules={handleReturnToModules}
-                />
               )}
             </div>
           )}

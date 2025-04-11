@@ -81,7 +81,7 @@ export const useQuizSubmission = (
       // Check if all questions are answered
       if (userAnswers.length < questions.length) {
         toast({
-          variant: "warning",
+          variant: "destructive",
           title: "Incomplete Quiz",
           description: "Please answer all questions before submitting."
         });
