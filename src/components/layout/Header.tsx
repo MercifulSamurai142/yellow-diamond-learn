@@ -13,8 +13,8 @@ const Header = ({ className }: HeaderProps) => {
       className
     )}>
       <div className="flex-1">
-        <h1 className="text-xl font-heading font-semibold tracking-tight text-yd-navy">
-          Learning Management System
+        <h1 className="text-xl font-heading font-semibold tracking-tight text-orange-600">
+          Yellow Diamond Academy
         </h1>
       </div>
       
@@ -32,15 +32,15 @@ const Header = ({ className }: HeaderProps) => {
       <div className="flex items-center gap-4">
         <button className="relative rounded-full p-1 hover:bg-muted">
           <Bell size={20} className="text-muted-foreground" />
-          <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-yd-yellow"></span>
+          <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-amber-500"></span>
         </button>
         <div className="flex items-center gap-3">
-          <div className="rounded-full bg-yd-navy h-8 w-8 flex items-center justify-center text-white font-medium">
-            JD
+          <div className="rounded-full bg-orange-500 h-8 w-8 flex items-center justify-center text-white font-medium">
+            YD
           </div>
           <div className="hidden md:block">
-            <p className="text-sm font-medium">John Doe</p>
-            <p className="text-xs text-muted-foreground">Sales Representative</p>
+            <p className="text-sm font-medium">Team Member</p>
+            <p className="text-xs text-muted-foreground">Yellow Diamond</p>
           </div>
         </div>
       </div>

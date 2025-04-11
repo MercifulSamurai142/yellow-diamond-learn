@@ -79,7 +79,7 @@ const LessonDetail = () => {
         
         setHasQuiz(quizData && quizData.length > 0);
 
-        // Find next lesson - FIX: Separate the filter and order operations
+        // Find next lesson - FIX: Properly construct the query for finding the next lesson
         const { data: nextLessonData, error: nextLessonError } = await supabase
           .from('lessons')
           .select('id, order')

@@ -66,6 +66,7 @@ export default {
         // Yellow Diamond brand colors
         yd: {
           yellow: '#FBBF24',
+          orange: '#F97316',
           navy: '#1E293B', 
           gray: '#64748B',
           lightGray: '#F1F5F9',

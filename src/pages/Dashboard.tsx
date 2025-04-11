@@ -1,6 +1,5 @@
-
 import { useEffect, useState } from "react";
-import { BookOpen, CheckCircle, Clock, Award, ChevronRight } from "lucide-react";
+import { BookOpen, CheckCircle, Award, ChevronRight } from "lucide-react";
 import { 
   YDCard, 
   YDCardContent, 
@@ -18,6 +17,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
 import { toast } from "@/hooks/use-toast";
 import { Tables } from "@/integrations/supabase/types";
+import HeroBanner from "@/components/dashboard/HeroBanner";
 
 type ModuleWithProgress = Tables<"modules"> & {
   lessons: number;
@@ -186,20 +186,12 @@ const Dashboard = () => {
         
         <main className="flex-1 overflow-y-auto p-6">
           <div className="yd-container animate-fade-in">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
-              <div>
-                <h2 className="yd-section-title">Dashboard</h2>
-                <p className="text-muted-foreground">Welcome back, {profile?.name || 'User'}!</p>
-              </div>
-              <div className="mt-4 md:mt-0">
-                {continueModule && (
-                  <Link to={`/modules/${continueModule.id}`}>
-                    <YDButton variant="default">
-                      {continueModule.status === "in-progress" ? "Resume Learning" : "Start Learning"}
-                    </YDButton>
-                  </Link>
-                )}
-              </div>
+            {/* Hero Banner */}
+            <HeroBanner />
+            
+            <div className="flex justify-between items-center mb-8">
+              <h2 className="text-2xl font-semibold text-orange-600">Welcome to Yellow Diamond Academy</h2>
+              <p className="text-slate-500">Track your progress and continue your learning journey</p>
             </div>
             
             {isLoading ? (
