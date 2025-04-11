@@ -54,7 +54,7 @@ const Sidebar = ({ className }: SidebarProps) => {
             <div className="bg-yd-yellow rounded-md p-1">
               <span className="font-bold text-yd-navy">YD</span>
             </div>
-            <span className="font-heading font-semibold text-white">Yellow Diamond</span>
+            <span className="font-heading font-semibold text-yd-navy">Yellow Diamond</span>
           </div>
         )}
         {collapsed && (

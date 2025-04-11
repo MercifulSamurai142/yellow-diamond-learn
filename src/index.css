@@ -39,14 +39,14 @@
 
     --radius: 0.5rem;
     
-    --sidebar-background: 217 33% 17%;
-    --sidebar-foreground: 214 32% 91%;
-    --sidebar-primary: 30 100% 50%;
-    --sidebar-primary-foreground: 217 33% 17%;
-    --sidebar-accent: 218 30% 22%;
-    --sidebar-accent-foreground: 214 32% 91%;
-    --sidebar-border: 218 30% 22%;
-    --sidebar-ring: 30 100% 50%;
+    --sidebar-background: 0 0% 96%;          /* Very light gray */
+    --sidebar-foreground: 0 0% 20%;          /* Dark gray */
+    --sidebar-primary: 30 100% 50%;         /* Bright orange (Kept original HSL as it matches) */
+    --sidebar-primary-foreground: 100 100% 100%;  /* White (Text on orange button) */
+    --sidebar-accent: 0 0% 92%;             /* Slightly darker light gray (for hover) */
+    --sidebar-accent-foreground: 0 0% 20%;   /* Dark gray (Text on hover) */
+    --sidebar-border: 0 0% 90%;             /* Subtle darker gray border */
+    --sidebar-ring: 30 100% 50%;            /* Bright orange (Focus ring) */
   }
 
   * {
