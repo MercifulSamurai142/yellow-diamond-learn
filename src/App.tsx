@@ -3,8 +3,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
-
-// Pages
 import AuthPage from "./pages/AuthPage";
 import Dashboard from "./pages/Dashboard";
 import Profile from "./pages/Profile";
@@ -17,6 +15,7 @@ import Progress from "./pages/Progress";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
 import { AuthProvider } from "./contexts/AuthContext";
+import {ProgressProvider} from "./contexts/ProgressContext"
 import ProtectedRoute from "./components/ProtectedRoute";
 
 const queryClient = new QueryClient();
@@ -28,6 +27,7 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
+        <ProgressProvider>
           <Routes>
             {/* Public routes */}
             <Route path="/" element={<AuthPage />} />
@@ -87,6 +87,7 @@ const App = () => (
             {/* Not found route */}
             <Route path="*" element={<NotFound />} />
           </Routes>
+          </ProgressProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>
