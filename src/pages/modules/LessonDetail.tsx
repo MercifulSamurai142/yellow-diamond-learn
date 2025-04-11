@@ -224,7 +224,8 @@ const LessonDetail = () => {
 
   // --- Render logic ---
 
-  if (isLoading && !lesson) { // Show main loading state only if lesson isn't loaded yet
+  if (isLoading) {
+    // Use the same full-page loading indicator structure
     return (
       <div className="flex h-screen bg-background">
         <Sidebar />
