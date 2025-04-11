@@ -79,13 +79,13 @@ const LessonDetail = () => {
         
         setHasQuiz(quizData && quizData.length > 0);
 
-        // Find next lesson
+        // Find next lesson - FIX: Separate the filter and order operations
         const { data: nextLessonData, error: nextLessonError } = await supabase
           .from('lessons')
           .select('id, order')
           .eq('module_id', moduleId)
           .gt('order', lessonData.order)
-          .order('order')
+          .order('order', { ascending: true })
           .limit(1);
 
         if (nextLessonError) throw nextLessonError;

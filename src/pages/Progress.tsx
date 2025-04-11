@@ -64,28 +64,34 @@ const ProgressPage = () => {
           const lessonIds = lessonsData ? lessonsData.map(l => l.id) : [];
           
           // Get user progress for these lessons
-          const { data: progressData, error: progressError } = await supabase
-            .from('user_progress')
-            .select('lesson_id, status, completed_at')
-            .eq('user_id', user.id)
-            .in('lesson_id', lessonIds.length > 0 ? lessonIds : ['none'])
-            .eq('status', 'completed');
-            
-          if (progressError) throw progressError;
-          
-          const completedLessons = progressData ? progressData.length : 0;
-          const percentage = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
-          
-          // Find most recent activity
+          let completedLessons = 0;
           let lastActivity = null;
-          if (progressData && progressData.length > 0) {
-            progressData.sort((a, b) => {
-              if (!a.completed_at) return 1;
-              if (!b.completed_at) return -1;
-              return new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime();
-            });
-            lastActivity = progressData[0].completed_at;
+          
+          // FIX: Only query if we have lesson IDs
+          if (lessonIds.length > 0) {
+            const { data: progressData, error: progressError } = await supabase
+              .from('user_progress')
+              .select('lesson_id, status, completed_at')
+              .eq('user_id', user.id)
+              .in('lesson_id', lessonIds)
+              .eq('status', 'completed');
+              
+            if (progressError) throw progressError;
+            
+            completedLessons = progressData ? progressData.length : 0;
+            
+            // Find most recent activity
+            if (progressData && progressData.length > 0) {
+              progressData.sort((a, b) => {
+                if (!a.completed_at) return 1;
+                if (!b.completed_at) return -1;
+                return new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime();
+              });
+              lastActivity = progressData[0].completed_at;
+            }
           }
+          
+          const percentage = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
 
           // Get quiz scores for this module
           let quizScore = null;
