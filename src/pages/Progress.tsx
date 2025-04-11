@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import Header from "@/components/layout/Header";
 import Sidebar from "@/components/layout/Sidebar";
@@ -20,8 +21,10 @@ type ModuleProgress = {
 };
 
 interface QuizResult {
-  score: number;
+  id: string;
+  user_id: string;
   quiz_id: string;
+  score: number;
   passed: boolean;
   created_at: string;
 }
@@ -96,7 +99,7 @@ const ProgressPage = () => {
             const quizIds = lessonsWithQuizzes
               .filter(l => l.quizzes && Array.isArray(l.quizzes) && l.quizzes.length > 0)
               .map(l => (Array.isArray(l.quizzes) ? l.quizzes[0].id : null))
-              .filter(Boolean);
+              .filter(Boolean) as string[];
             
             if (quizIds.length > 0) {
               try {
@@ -104,8 +107,8 @@ const ProgressPage = () => {
                 const { data: quizResults, error: quizResultsError } = await supabase
                   .rpc('get_user_quiz_results', { 
                     user_id_param: user.id,
-                    quiz_ids_param: quizIds as unknown as string[]
-                  });
+                    quiz_ids_param: quizIds
+                  }) as { data: QuizResult[] | null, error: any };
                 
                 if (quizResultsError) {
                   console.error("Error fetching quiz results:", quizResultsError);

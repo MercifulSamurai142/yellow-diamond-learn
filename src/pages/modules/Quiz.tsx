@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import Header from "@/components/layout/Header";
@@ -146,6 +147,7 @@ const Quiz = () => {
     setQuizCompleted(true);
     
     try {
+      // Use RPC function to save quiz result
       const { error } = await supabase.rpc('save_quiz_result', {
         user_id_param: user.id,
         quiz_id_param: quiz.id,
@@ -158,6 +160,7 @@ const Quiz = () => {
       if (error) {
         console.error("Error saving quiz results:", error);
         try {
+          // Fallback to another RPC function
           await supabase.rpc('insert_quiz_result', {
             user_id_input: user.id,
             quiz_id_input: quiz.id,
