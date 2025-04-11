@@ -171,6 +171,54 @@ export type Database = {
           },
         ]
       }
+      quiz_results: {
+        Row: {
+          answers_json: Json | null
+          created_at: string | null
+          id: string
+          lesson_id: string | null
+          passed: boolean
+          quiz_id: string
+          score: number
+          user_id: string
+        }
+        Insert: {
+          answers_json?: Json | null
+          created_at?: string | null
+          id?: string
+          lesson_id?: string | null
+          passed: boolean
+          quiz_id: string
+          score: number
+          user_id: string
+        }
+        Update: {
+          answers_json?: Json | null
+          created_at?: string | null
+          id?: string
+          lesson_id?: string | null
+          passed?: boolean
+          quiz_id?: string
+          score?: number
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "quiz_results_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "lessons"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "quiz_results_quiz_id_fkey"
+            columns: ["quiz_id"]
+            isOneToOne: false
+            referencedRelation: "quizzes"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       quizzes: {
         Row: {
           created_at: string | null
@@ -322,9 +370,42 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_user_quiz_results: {
+        Args: { user_id_param: string; quiz_ids_param: string[] }
+        Returns: {
+          id: string
+          user_id: string
+          quiz_id: string
+          score: number
+          passed: boolean
+          created_at: string
+        }[]
+      }
       get_user_role: {
         Args: { user_id: string }
         Returns: string
+      }
+      insert_quiz_result: {
+        Args: {
+          user_id_input: string
+          quiz_id_input: string
+          lesson_id_input: string
+          score_input: number
+          passed_input: boolean
+          answers_json_input: Json
+        }
+        Returns: undefined
+      }
+      save_quiz_result: {
+        Args: {
+          user_id_param: string
+          quiz_id_param: string
+          lesson_id_param: string
+          score_param: number
+          passed_param: boolean
+          answers_json_param: Json
+        }
+        Returns: undefined
       }
     }
     Enums: {

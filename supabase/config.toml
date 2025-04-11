@@ -35,5 +35,3 @@ site_url = "http://localhost:3000"
 enabled = true
 port = 54327
 
-[vector]
-enabled = false
