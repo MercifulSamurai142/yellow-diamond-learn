@@ -13,6 +13,7 @@ import {
   LogOut
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface SidebarProps {
   className?: string;
@@ -21,6 +22,7 @@ interface SidebarProps {
 const Sidebar = ({ className }: SidebarProps) => {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
+  const {signOut}  = useAuth()
   
   const isActive = (path: string) => {
     return location.pathname === path;
@@ -112,7 +114,7 @@ const Sidebar = ({ className }: SidebarProps) => {
       </nav>
       
       <div className="p-2 border-t border-sidebar-border">
-        <button className={cn(
+        <button onClick={()=>signOut()} className={cn(
           "flex items-center gap-3 w-full px-2 py-2 rounded-md transition-colors hover:bg-sidebar-accent text-sidebar-foreground/90"
         )}>
           <LogOut size={20} />
