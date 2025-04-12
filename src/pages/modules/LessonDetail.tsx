@@ -10,6 +10,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { Tables } from "@/integrations/supabase/types";
+import { checkAndAwardAchievements } from "@/services/achivementServices";
+import { CheckContext } from "@/services/achivementServices";
 
 type Lesson = Tables<"lessons">
 
@@ -189,6 +191,16 @@ const LessonDetail = () => {
         .single(); // Expect one row affected/returned
 
       if (error) throw error;
+
+      if (user && lessonId && moduleId) { // Ensure needed IDs are available
+        const checkContext: CheckContext = {
+            userId: user.id,
+            lessonId: lessonId,
+            moduleId: moduleId,
+        };
+        // Run checks in background, don't necessarily await unless needed for immediate UI update
+         checkAndAwardAchievements(checkContext).catch(err => console.error("Achievement check failed:", err));
+    }
 
       toast({
         title: "Lesson completed!",

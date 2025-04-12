@@ -34,7 +34,8 @@ const Quiz = () => {
     questions, 
     quiz?.pass_threshold || 70, 
     quiz?.id || '', 
-    lessonId || ''
+    lessonId || '',
+    moduleId
   );
 
   // Navigation handlers
