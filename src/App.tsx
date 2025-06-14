@@ -18,7 +18,17 @@ import { AuthProvider } from "./contexts/AuthContext";
 import {ProgressProvider} from "./contexts/ProgressContext"
 import ProtectedRoute from "./components/ProtectedRoute";
 
-const queryClient = new QueryClient();
+// Create a single, stable QueryClient instance outside the component
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 5 * 60 * 1000, // 5 minutes
+      gcTime: 10 * 60 * 1000, // 10 minutes (formerly cacheTime)
+      refetchOnWindowFocus: false, // Disable refetch on window focus
+      retry: 1,
+    },
+  },
+});
 
 const App = () => (
   <QueryClientProvider client={queryClient}>

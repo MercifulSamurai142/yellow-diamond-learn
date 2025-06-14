@@ -1,8 +1,7 @@
-
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
 
 // Define the shape of our context
@@ -33,18 +32,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession] = useState<Session | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const navigate = useNavigate();
+  const location = useLocation();
 
+  // Get initial session only once on mount
   useEffect(() => {
-    // Get initial session
     const getInitialSession = async () => {
       try {
         const { data, error } = await supabase.auth.getSession();
-        
         if (error) {
           console.error('Error getting session:', error);
           return;
         }
-        
         setSession(data.session);
         setUser(data.session?.user ?? null);
       } catch (error) {
@@ -55,37 +53,48 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     };
 
     getInitialSession();
+  }, []); // Empty dependency array - only run once on mount
 
-    // Listen for auth changes
+  // Separate effect for auth state changes
+  useEffect(() => {
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
-        console.log('Auth event:', event);
-        setSession(session);
-        setUser(session?.user ?? null);
+        // Only update state for explicit sign-in/sign-out events
+        if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+          console.log('Auth event:', event);
+          setSession(session);
+          setUser(session?.user ?? null);
 
-        if (event === 'SIGNED_IN' && session) {
-          navigate('/dashboard');
-          toast({
-            title: 'Welcome!',
-            description: 'You have successfully signed in.',
-          });
+          if (event === 'SIGNED_IN' && session) {
+            // Only navigate if explicitly signing in
+            if (location.pathname === '/login' || location.pathname === '/') {
+              navigate('/dashboard', { replace: true });
+            }
+            toast({
+              title: 'Welcome!',
+              description: 'You have successfully signed in.',
+            });
+          }
+          
+          if (event === 'SIGNED_OUT') {
+            // Only navigate if explicitly signing out
+            if (location.pathname !== '/login' && location.pathname !== '/') {
+              navigate('/login', { replace: true });
+            }
+            toast({
+              title: 'Goodbye!',
+              description: 'You have signed out.',
+            });
+          }
         }
-        
-        if (event === 'SIGNED_OUT') {
-          navigate('/login');
-          toast({
-            title: 'Goodbye!',
-            description: 'You have signed out.',
-          });
-        }
+        // Ignore all other events (like token refresh)
       }
     );
 
-    // Cleanup subscription on unmount
     return () => {
       authListener.subscription.unsubscribe();
     };
-  }, [navigate]);
+  }, [navigate, location.pathname]);
 
   // Sign in with email and password
   const signIn = async (email: string, password: string) => {
