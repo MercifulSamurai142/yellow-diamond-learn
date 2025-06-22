@@ -1,12 +1,15 @@
-
 import { Bell, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
+// Import your user/profile hook
+import { useProfile } from "@/hooks/useProfile"; // Adjust the import path as needed
 
 interface HeaderProps {
   className?: string;
 }
 
 const Header = ({ className }: HeaderProps) => {
+  const { profile } = useProfile(); // Replace with your actual hook/context
+
   return (
     <header className={cn(
       "w-full h-16 border-b bg-white flex items-center justify-between px-6",
@@ -35,11 +38,28 @@ const Header = ({ className }: HeaderProps) => {
           <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-amber-500"></span>
         </button>
         <div className="flex items-center gap-3">
+          {/* Placeholder for user profile image or initials */}
           <div className="rounded-full bg-orange-500 h-8 w-8 flex items-center justify-center text-white font-medium">
-            YD
+            {profile?.profile_picture ? (
+              <img
+                src={
+                  profile?.profile_picture
+                    ? `${profile.profile_picture}${profile.updated_at ? `?v=${profile.updated_at}` : ''}`
+                    : undefined
+                }
+                alt="Profile"
+                className="w-full h-full rounded-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full rounded-full bg-primary/20 flex items-center justify-center text-primary text-4xl font-medium">
+                YD
+              </div>
+            )}
           </div>
           <div className="hidden md:block">
-            <p className="text-sm font-medium">Team Member</p>
+            <p className="text-sm font-medium">
+              {profile?.name || "Team Member"}
+            </p>
             <p className="text-xs text-muted-foreground">Yellow Diamond</p>
           </div>
         </div>
