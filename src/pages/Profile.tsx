@@ -129,13 +129,14 @@ const Profile = () => {
     if (!profile) return;
     setUpdating(true);
     try {
-      const updateData: Partial<Pick<UserProfile, 'name'>> = {};
+      const updateData: Partial<UserProfile> = {};
       if (formData.name !== profile.name) updateData.name = formData.name;
+      if (formData.region !== profile.region) updateData.region = formData.region; // <-- Add this line
 
       if (Object.keys(updateData).length === 0) {
-         toast({ title: "No changes detected."});
-         setUpdating(false);
-         return;
+        toast({ title: "No changes detected." });
+        setUpdating(false);
+        return;
       }
 
       const { error } = await updateProfile(updateData);
