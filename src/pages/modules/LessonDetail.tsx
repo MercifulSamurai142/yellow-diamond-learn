@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import Header from "@/components/layout/Header";
@@ -295,15 +294,24 @@ const LessonDetail = () => {
 
             <h2 className="yd-section-title mb-6">{lesson.title}</h2>
 
-            <YDCard className="mb-8 overflow-hidden"> {/* Added overflow-hidden */}
-               {/* Optional: Add image or video placeholder */}
-               {/* <img src="/api/placeholder/800/300" alt="Lesson visual" className="w-full h-48 object-cover mb-0" /> */}
+            {lesson.video_url ? (
+                <div className="aspect-video bg-black">
+                  <video
+                    key={lesson.video_url} // Force re-render if URL changes
+                    controls
+                    className="w-full h-full"
+                    src={lesson.video_url}
+                  >
+                    Your browser does not support the video tag.
+                  </video>
+                </div>
+              ) : null}
+            <YDCard className="mb-8 overflow-hidden">
+              
               <div className="p-6">
                 {lesson.content ? (
                   // Using prose for basic styling, ensure Tailwind typography plugin is installed
                   <div className="prose dark:prose-invert max-w-none">
-                    {/* WARNING: Only use dangerouslySetInnerHTML if lesson.content is TRUSTED HTML */}
-                    {/* Consider using a Markdown renderer (like react-markdown) if content is Markdown */}
                     <div dangerouslySetInnerHTML={{ __html: lesson.content }} />
                   </div>
                 ) : (
