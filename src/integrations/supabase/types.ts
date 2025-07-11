@@ -82,6 +82,7 @@ export type Database = {
           title: string
           updated_at: string | null
           video_url: string | null
+          language: string | null
         }
         Insert: {
           content?: string | null
@@ -93,6 +94,7 @@ export type Database = {
           title: string
           updated_at?: string | null
           video_url?: string | null
+          language?: string | null
         }
         Update: {
           content?: string | null
@@ -104,6 +106,7 @@ export type Database = {
           title?: string
           updated_at?: string | null
           video_url?: string | null
+          language?: string | null
         }
         Relationships: [
           {
@@ -123,6 +126,8 @@ export type Database = {
           name: string
           order: number
           updated_at: string | null
+          video_url: string | null
+          language: string | null
         }
         Insert: {
           created_at?: string | null
@@ -131,6 +136,8 @@ export type Database = {
           name: string
           order: number
           updated_at?: string | null
+          video_url?: string | null
+          language?: string | null
         }
         Update: {
           created_at?: string | null
@@ -139,6 +146,8 @@ export type Database = {
           name?: string
           order?: number
           updated_at?: string | null
+          video_url?: string | null
+          language?: string | null
         }
         Relationships: []
       }
