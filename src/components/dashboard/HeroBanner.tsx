@@ -5,7 +5,7 @@ import YDButton from "@/components/ui/YDButton";
 
 const HeroBanner = () => {
   return (
-    <div className="relative w-full rounded-2xl overflow-hidden mb-8">
+    <div className="relative w-full  overflow-hidden mb-8">
       <div className="bg-gradient-to-r from-yellow-400 via-amber-500 to-orange-500 p-8 md:p-10">
         <div className="flex flex-col md:flex-row items-center">
           <div className="flex-1">
