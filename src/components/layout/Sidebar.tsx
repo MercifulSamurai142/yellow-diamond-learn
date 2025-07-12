@@ -160,7 +160,7 @@ const Sidebar = ({ className }: SidebarProps) => {
       <aside
         className={cn(
           "bg-sidebar text-sidebar-foreground h-screen flex-col hidden md:flex", // Hide on mobile
-          collapsed ? "w-[60px]" : "w-[240px]",
+          collapsed ? "w-[70px]" : "w-[240px]",
           "transition-all duration-300 ease-in-out",
           className
         )}
