@@ -31,7 +31,7 @@ const Sidebar = ({ className }: SidebarProps) => {
   const navigationItems = [
     { name: 'Dashboard', icon: <LayoutDashboard size={20} />, path: '/dashboard' },
     { name: 'Modules', icon: <BookOpen size={20} />, path: '/modules' },
-    { name: 'Achievements', icon: <Award size={20} />, path: '/achievements' },
+    // { name: 'Achievements', icon: <Award size={20} />, path: '/achievements' },
     { name: 'Progress', icon: <LineChart size={20} />, path: '/progress' },
     { name: 'Profile', icon: <User size={20} />, path: '/profile' },
   ];
