@@ -109,29 +109,29 @@ const Dashboard = () => {
         setModules(modulesWithProgress);
 
         // Fetch achievements
-        const { data: achievementsData, error: achievementsError } = await supabase
-          .from('achievements')
-          .select('*'); // Select fields needed for display
+        // const { data: achievementsData, error: achievementsError } = await supabase
+        //   .from('achievements')
+        //   .select('*'); // Select fields needed for display
 
-        if (achievementsError) throw achievementsError;
-        if (!achievementsData) throw new Error("No achievements found");
+        // if (achievementsError) throw achievementsError;
+        // if (!achievementsData) throw new Error("No achievements found");
 
-        // Fetch unlocked achievements
-        const { data: unlockedAchievementsData, error: unlockedError } = await supabase
-          .from('user_achievements')
-          .select('achievement_id')
-          .eq('user_id', user.id);
+        // // Fetch unlocked achievements
+        // const { data: unlockedAchievementsData, error: unlockedError } = await supabase
+        //   .from('user_achievements')
+        //   .select('achievement_id')
+        //   .eq('user_id', user.id);
 
-        if (unlockedError) throw unlockedError;
+        // if (unlockedError) throw unlockedError;
 
-        const unlockedIds = new Set(unlockedAchievementsData?.map(ua => ua.achievement_id) || []);
+        // const unlockedIds = new Set(unlockedAchievementsData?.map(ua => ua.achievement_id) || []);
 
-        const achievementsWithStatus = achievementsData.map(achievement => ({
-          ...achievement,
-          unlocked: unlockedIds.has(achievement.id)
-        }));
+        // const achievementsWithStatus = achievementsData.map(achievement => ({
+        //   ...achievement,
+        //   unlocked: unlockedIds.has(achievement.id)
+        // }));
 
-        setAchievements(achievementsWithStatus);
+        // setAchievements(achievementsWithStatus);
 
       } catch (error) {
         console.error('Error fetching dashboard list data:', error);
@@ -196,14 +196,14 @@ const Dashboard = () => {
             ) : (
               <>
                 {/* Progress summary - Uses progressStats from Context */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-8">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
                   <YDCard>
                     <div className="flex items-center p-4">
                       <div className="p-3 bg-primary/10 rounded-lg mr-4">
                         <BookOpen size={24} className="text-primary" />
                       </div>
                       <div>
-                        <p className="text-muted-foreground text-sm">Course Progress</p>
+                        <p className="text-foreground text-sm">Course Progress</p>
                         <p className="text-2xl font-semibold">{progressStats.moduleProgress}%</p>
                       </div>
                     </div>
@@ -215,13 +215,13 @@ const Dashboard = () => {
                         <CheckCircle size={24} className="text-green-500" />
                       </div>
                       <div>
-                        <p className="text-muted-foreground text-sm">Modules Completed</p>
+                        <p className="text-foreground text-sm">Modules Completed</p>
                         <p className="text-2xl font-semibold">{progressStats.completedModules}/{progressStats.totalModules}</p>
                       </div>
                     </div>
                   </YDCard>
 
-                  <YDCard>
+                  {/* <YDCard>
                     <div className="flex items-center p-4">
                       <div className="p-3 bg-amber-500/10 rounded-lg mr-4">
                         <Award size={24} className="text-amber-500" />
@@ -231,7 +231,7 @@ const Dashboard = () => {
                         <p className="text-2xl font-semibold">{progressStats.unlockedAchievements}/{progressStats.totalAchievements}</p>
                       </div>
                     </div>
-                  </YDCard>
+                  </YDCard> */}
                 </div>
 
                 {/* Modules - Uses local 'modules' state */}
@@ -283,6 +283,8 @@ const Dashboard = () => {
                 </div>
 
                 {/* Recent Achievements - Uses local 'achievements' state */}
+                
+                {/* 
                 <div>
                   <div className="flex justify-between items-center mb-4">
                     <h3 className="text-xl font-medium text-foreground">Recent Achievements</h3>
@@ -296,7 +298,7 @@ const Dashboard = () => {
                     </div>
                   ) : achievements.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      {/* Show unlocked first, then locked, limit to 3 */}
+                      // Show unlocked first, then locked, limit to 3
                       {[...achievements]
                           .sort((a, b) => (b.unlocked ? 1 : 0) - (a.unlocked ? 1 : 0))
                           .slice(0, 3)
@@ -323,7 +325,9 @@ const Dashboard = () => {
                   ) : (
                       <p className="text-muted-foreground">No achievements available yet.</p>
                   )}
-                </div>
+                </div> 
+                */}
+                  
               </>
             )}
           </div>
