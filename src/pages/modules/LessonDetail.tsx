@@ -11,6 +11,8 @@ import { toast } from "@/hooks/use-toast";
 import { Tables } from "@/integrations/supabase/types";
 import { checkAndAwardAchievements } from "@/services/achivementServices";
 import { CheckContext } from "@/services/achivementServices";
+import { useIsMobile } from "@/hooks/use-mobile"; // Import useIsMobile
+import { cn } from "@/lib/utils"; // Import cn utility to combine classes
 
 type Lesson = Tables<"lessons">
 
@@ -28,6 +30,7 @@ const LessonDetail = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const { user } = useAuth();
   const navigate = useNavigate();
+  const isMobile = useIsMobile(); // Use the hook to detect mobile
 
   useEffect(() => {
     const fetchLessonData = async () => {
@@ -279,8 +282,8 @@ const LessonDetail = () => {
       <Sidebar />
       <div className="flex flex-col flex-1 overflow-hidden">
         <Header />
-        <main className="flex-1 overflow-y-auto p-6">
-          <div className="yd-container animate-fade-in">
+        <main className={cn("flex-1 overflow-y-auto ", isMobile ? "px-0 py-6" : "p-6")}>
+          <div className={cn("yd-container animate-fade-in", isMobile ? "p-0": "")}> {/* Apply dynamic padding based on isMobile */}
             <div className="flex flex-wrap justify-between items-center gap-4 mb-8"> {/* Use flex-wrap and gap */}
               <Link to={`/modules/${moduleId}`} className="text-primary hover:underline flex items-center text-sm">
                 <ArrowLeft size={16} className="mr-1" />
@@ -292,10 +295,12 @@ const LessonDetail = () => {
               </div>
             </div>
 
-            <h2 className="yd-section-title mb-6">{lesson.title}</h2>
+            {/* Apply dynamic padding based on isMobile */}
+            <h2 className={cn("yd-section-title mb-6", isMobile ? "px-4" : "px-0")}>{lesson.title}</h2> {/* <-- Dynamically apply px-4 on mobile */}
 
             {lesson.video_url ? (
-                <div className="aspect-video bg-black">
+                // Use a responsive container for the video. On mobile, remove horizontal padding.
+                <div className={cn("aspect-video", isMobile ? "px-4 bg-white":"bg-black")}> {/* Removed px-0 md:px-0 as it's redundant/unnecessary here */}
                   <video
                     key={lesson.video_url} // Force re-render if URL changes
                     controls
@@ -306,16 +311,20 @@ const LessonDetail = () => {
                   </video>
                 </div>
               ) : null}
-            <YDCard className="mb-8 overflow-hidden">
+            <YDCard className="mb-8 overflow-hidden rounded-none md:rounded-lg"> {/* <-- ADDED rounded-none md:rounded-lg */}
               
-              <div className="p-6">
+              {/* Line 282: The div inside YDCard. Change its padding */}
+              {/* Dynamically apply p-0 on mobile, p-6 on desktop using isMobile */}
+              <div className={cn(isMobile ? "p-0" : "p-6")}> {/* <-- Dynamically apply p-0 on mobile */}
                 {lesson.content ? (
                   // Using prose for basic styling, ensure Tailwind typography plugin is installed
-                  <div className="prose dark:prose-invert max-w-none">
+                  // Ensure prose elements expand fully within the card content
+                  <div className="prose dark:prose-invert max-w-full">
                     <div dangerouslySetInnerHTML={{ __html: lesson.content }} />
                   </div>
                 ) : (
-                  <p className="text-muted-foreground">This lesson has no content yet.</p>
+                  // Apply dynamic padding for the "no content" message
+                  <p className={cn("text-muted-foreground", isMobile ? "px-4" : "px-0")}>This lesson has no content yet.</p> 
                 )}
               </div>
             </YDCard>
