@@ -40,7 +40,7 @@ const ModuleDetail = () => {
         // Fetch module details
         const { data: moduleData, error: moduleError } = await supabase
           .from('modules')
-          .select('*') // Select required fields: id, name, description
+          .select('*') // Select required fields: id, name, description, video_url
           .eq('id', moduleId)
           .single();
 
@@ -196,6 +196,21 @@ const ModuleDetail = () => {
 
             <h2 className="yd-section-title mb-2">{module.name}</h2>
             <p className="text-muted-foreground mb-8">{module.description || 'No description available.'}</p>
+            
+            {module.video_url && (
+              <div className="mb-8 rounded-lg overflow-hidden shadow-lg">
+                <div className="aspect-video bg-black">
+                  <video
+                    key={module.video_url}
+                    controls
+                    className="w-full h-full"
+                    src={module.video_url}
+                  >
+                    Your browser does not support the video tag.
+                  </video>
+                </div>
+              </div>
+            )}
 
             <h3 className="text-xl font-semibold mb-4 border-b pb-2">Lessons & Quizzes</h3>
 

@@ -1,5 +1,4 @@
-
-import { useState } from "react";
+import React, { useState } from "react";
 import { YDCard } from "@/components/ui/YDCard";
 import YDButton from "@/components/ui/YDButton";
 import { supabase } from "@/integrations/supabase/client";
@@ -8,7 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Pencil, Trash2, Plus } from "lucide-react";
+import { Pencil, Trash2, Plus, Loader2 } from "lucide-react";
 import { Module, Lesson } from "@/pages/Admin";
 
 interface LessonManagerProps {
@@ -26,10 +25,24 @@ const LessonManager = ({ lessons, modules, onLessonsUpdate, refreshData }: Lesso
     content: "",
     duration_minutes: 15,
     order: 1,
-    module_id: ""
+    module_id: "",
+    video_url: null as string | null,
+    language: "english",
   });
   const [selectedModuleId, setSelectedModuleId] = useState<string | null>(null);
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [availableVideos, setAvailableVideos] = useState<{ name: string }[]>([]);
+  const [isListingVideos, setIsListingVideos] = useState(false);
 
+  // Handler for video file selection
+  const handleVideoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setVideoFile(file);
+    }
+  };
+  
   const handleAddLesson = async () => {
     try {
       if (!newLesson.title || !newLesson.module_id) {
@@ -41,44 +54,76 @@ const LessonManager = ({ lessons, modules, onLessonsUpdate, refreshData }: Lesso
         return;
       }
 
-      const { data, error } = await supabase
+      // Step 1: Insert lesson data without video URL
+      const { data: newLessonData, error } = await supabase
         .from("lessons")
         .insert({
           title: newLesson.title,
           content: newLesson.content,
           duration_minutes: newLesson.duration_minutes,
           order: newLesson.order,
-          module_id: newLesson.module_id
+          module_id: newLesson.module_id,
+          language: newLesson.language,
+          video_url: null // Start with null
         })
-        .select();
+        .select()
+        .single();
 
       if (error) throw error;
+      if (!newLessonData) throw new Error("Failed to create lesson, no data returned.");
 
+      let finalLessonData = newLessonData;
+
+      // Step 2: If there's a video file, upload it and update the lesson
+      if (videoFile) {
+        setIsUploading(true);
+        const fileExtension = videoFile.name.split('.').pop();
+        const filePath = `public/${newLessonData.id}/${videoFile.name}`;
+        const { error: uploadError } = await supabase.storage
+          .from("lesson-videos")
+          .upload(filePath, videoFile, { upsert: true });
+
+        setIsUploading(false);
+        if (uploadError) throw uploadError;
+
+        const { data: urlData } = supabase.storage.from("lesson-videos").getPublicUrl(filePath);
+        
+        // Step 3: Update the lesson with the new video_url
+        const { data: updatedData, error: updateError } = await supabase
+          .from("lessons")
+          .update({ video_url: urlData.publicUrl })
+          .eq("id", newLessonData.id)
+          .select()
+          .single();
+
+        if (updateError) throw updateError;
+        finalLessonData = updatedData;
+      }
+      
       toast({
         title: "Success",
         description: "Lesson added successfully",
       });
 
       // Update local state
-      if (data) {
-        onLessonsUpdate([...lessons, data[0]]);
+      if (finalLessonData) {
+        onLessonsUpdate([...lessons, finalLessonData]);
       }
 
-      // Reset form
       resetForm();
       await refreshData();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error adding lesson:", error);
       toast({
         variant: "destructive",
         title: "Error",
-        description: "Failed to add lesson",
+        description: `Failed to add lesson: ${error.message}`,
       });
     }
   };
 
   const handleEditLesson = async (lessonId: string) => {
-    const lessonToEdit = lessons.find(l => l.id === lessonId);
+    const lessonToEdit = lessons.find((l) => l.id === lessonId);
     if (!lessonToEdit) return;
 
     setEditingLessonId(lessonId);
@@ -87,10 +132,30 @@ const LessonManager = ({ lessons, modules, onLessonsUpdate, refreshData }: Lesso
       content: lessonToEdit.content || "",
       duration_minutes: lessonToEdit.duration_minutes,
       order: lessonToEdit.order,
-      module_id: lessonToEdit.module_id || ""
+      module_id: lessonToEdit.module_id || "",
+      video_url: lessonToEdit.video_url || null,
+      language: lessonToEdit.language || "english",
     });
     setSelectedModuleId(lessonToEdit.module_id || null);
     setIsAddingLesson(true);
+    fetchAvailableVideos(lessonId);
+  };
+
+  const fetchAvailableVideos = async (lessonId: string) => {
+    setIsListingVideos(true);
+    try {
+        const { data, error } = await supabase.storage
+            .from('lesson-videos')
+            .list(`public/${lessonId}`);
+        if (error) throw error;
+        setAvailableVideos(data || []);
+    } catch (error) {
+        console.error("Error listing videos:", error);
+        toast({ variant: 'destructive', title: 'Could not fetch video list.' });
+        setAvailableVideos([]);
+    } finally {
+        setIsListingVideos(false);
+    }
   };
 
   const handleUpdateLesson = async () => {
@@ -106,6 +171,24 @@ const LessonManager = ({ lessons, modules, onLessonsUpdate, refreshData }: Lesso
         return;
       }
 
+      let finalVideoUrl = newLesson.video_url;
+
+      // Handle video upload if a new file is selected
+      if (videoFile) {
+        setIsUploading(true);
+        const fileExtension = videoFile.name.split('.').pop();
+        const filePath = `public/${editingLessonId}/${videoFile.name}`;
+        const { error: uploadError } = await supabase.storage
+          .from("lesson-videos")
+          .upload(filePath, videoFile, { upsert: true });
+
+        setIsUploading(false);
+        if (uploadError) throw uploadError;
+
+        const { data: urlData } = supabase.storage.from("lesson-videos").getPublicUrl(filePath);
+        finalVideoUrl = urlData.publicUrl;
+      }
+
       const { error } = await supabase
         .from("lessons")
         .update({
@@ -113,7 +196,9 @@ const LessonManager = ({ lessons, modules, onLessonsUpdate, refreshData }: Lesso
           content: newLesson.content,
           duration_minutes: newLesson.duration_minutes,
           order: newLesson.order,
-          module_id: newLesson.module_id
+          module_id: newLesson.module_id,
+          language: newLesson.language,
+          video_url: finalVideoUrl,
         })
         .eq("id", editingLessonId);
 
@@ -124,23 +209,6 @@ const LessonManager = ({ lessons, modules, onLessonsUpdate, refreshData }: Lesso
         description: "Lesson updated successfully",
       });
 
-      // Update local state
-      const updatedLessons = lessons.map(lesson => {
-        if (lesson.id === editingLessonId) {
-          return {
-            ...lesson,
-            title: newLesson.title,
-            content: newLesson.content,
-            duration_minutes: newLesson.duration_minutes,
-            order: newLesson.order,
-            module_id: newLesson.module_id
-          };
-        }
-        return lesson;
-      });
-      onLessonsUpdate(updatedLessons);
-
-      // Reset form
       resetForm();
       await refreshData();
     } catch (error) {
@@ -153,8 +221,54 @@ const LessonManager = ({ lessons, modules, onLessonsUpdate, refreshData }: Lesso
     }
   };
 
+  const handleRemoveVideo = async (videoName: string) => {
+    if (!editingLessonId) return;
+
+    const isConfirmed = window.confirm(`Are you sure you want to permanently delete the video "${videoName}"? This action cannot be undone.`);
+    if (!isConfirmed) return;
+
+    const filePath = `public/${editingLessonId}/${videoName}`;
+    try {
+        const { error: storageError } = await supabase.storage
+            .from('lesson-videos')
+            .remove([filePath]);
+
+        if (storageError) throw storageError;
+
+        toast({ title: 'Success', description: 'Video deleted from storage.' });
+
+        // Check if the deleted video was the active one in the database
+        const { data: lessonData } = await supabase.from('lessons').select('video_url').eq('id', editingLessonId).single();
+        const activeVideoUrl = lessonData?.video_url;
+
+        const deletedVideoUrlPart = `/${filePath}`;
+        // If the deleted video is the one currently saved in the DB, nullify the column
+        if (activeVideoUrl && activeVideoUrl.endsWith(deletedVideoUrlPart)) {
+            await supabase.from('lessons').update({ video_url: null }).eq('id', editingLessonId);
+            setNewLesson(prev => ({ ...prev, video_url: null }));
+        }
+        
+        // Refresh the list of videos in the UI
+        fetchAvailableVideos(editingLessonId);
+    } catch (error: any) {
+        console.error("Error deleting video:", error);
+        toast({ variant: 'destructive', title: 'Error', description: `Failed to delete video: ${error.message}` });
+    }
+  };
+
   const handleDeleteLesson = async (lessonId: string) => {
     try {
+      // Before deleting from DB, remove associated video from storage
+      const lessonToDelete = lessons.find(l => l.id === lessonId);
+      if (lessonToDelete?.video_url) {
+        try {
+          const filePath = new URL(lessonToDelete.video_url).pathname.split('/lesson-videos/')[1];
+          await supabase.storage.from('lesson-videos').remove([filePath]);
+        } catch(storageError) {
+          console.error("Failed to delete video from storage, but proceeding with DB deletion:", storageError);
+        }
+      }
+      
       const { error } = await supabase
         .from("lessons")
         .delete()
@@ -188,13 +302,19 @@ const LessonManager = ({ lessons, modules, onLessonsUpdate, refreshData }: Lesso
       content: "",
       duration_minutes: 15,
       order: 1,
-      module_id: ""
+      module_id: "",
+      video_url: null,
+      language: "english",
     });
+    setVideoFile(null);
+    setIsUploading(false);
     setSelectedModuleId(null);
+    setAvailableVideos([]);
+    setIsListingVideos(false);
   };
 
   const getModuleLessons = (moduleId: string) => {
-    return lessons.filter(lesson => lesson.module_id === moduleId);
+    return lessons.filter((lesson) => lesson.module_id === moduleId);
   };
 
   return (
@@ -243,13 +363,35 @@ const LessonManager = ({ lessons, modules, onLessonsUpdate, refreshData }: Lesso
             </div>
             
             <div>
-              <Label htmlFor="lessonTitle">Lesson Title</Label>
-              <Input
-                id="lessonTitle"
-                value={newLesson.title}
-                onChange={(e) => setNewLesson({ ...newLesson, title: e.target.value })}
-                placeholder="Enter lesson title"
-              />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <Label>Lesson Title</Label>
+                  <Input
+                    id="lessonTitle"
+                    value={newLesson.title}
+                    onChange={(e) => setNewLesson({ ...newLesson, title: e.target.value })}
+                    placeholder="Enter lesson title"
+                    className="flex-grow"
+                  />
+                </div>
+                <div>
+                  <Label>Lesson Language</Label>
+                  <Select
+                    value={newLesson.language}
+                    onValueChange={(value) => setNewLesson({ ...newLesson, language: value })}
+                  >
+                    <SelectTrigger className="w-full">
+                      <SelectValue placeholder="Language" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="english">English</SelectItem>
+                      <SelectItem value="hindi">हिन्दी (Hindi)</SelectItem>
+                      <SelectItem value="kannada">ಕನ್ನಡ (Kannada)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+              </div>
             </div>
             
             <div>
@@ -262,6 +404,43 @@ const LessonManager = ({ lessons, modules, onLessonsUpdate, refreshData }: Lesso
                 rows={6}
               />
             </div>
+
+            <div>
+              <Label htmlFor="lessonVideo">Upload Lesson Video (Optional)</Label>
+                <Input
+                  id="lessonVideo"
+                  type="file"
+                  accept="video/mp4,video/webm"
+                  onChange={handleVideoFileChange}
+                  disabled={isUploading}
+                />
+              {videoFile && <p className="mt-2 text-sm text-muted-foreground">New video to upload: {videoFile.name}</p>}
+              {isUploading && <p className="text-sm text-muted-foreground mt-2 flex items-center"><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Uploading video...</p>}
+            </div>
+            
+            {editingLessonId && (
+              <div>
+                <Label>Available Videos</Label>
+                {isListingVideos ? (
+                  <p className="text-sm text-muted-foreground">Loading video list...</p>
+                ) : availableVideos.length > 0 ? (
+                  <div className="mt-2 space-y-2 rounded-md border p-2">
+                    {availableVideos.map(video => (
+                      <div key={video.name} className="flex items-center justify-between text-sm">
+                        <span>{video.name}</span>
+                        <button
+                          type="button"
+                          onClick={() => handleRemoveVideo(video.name)}
+                          className="text-red-500 hover:underline font-medium"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                ) : (<p className="text-sm text-muted-foreground mt-1">No videos uploaded for this lesson.</p>)}
+              </div>
+            )}
             
             <div className="grid grid-cols-2 gap-4">
               <div>

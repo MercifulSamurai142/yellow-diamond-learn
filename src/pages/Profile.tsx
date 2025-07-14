@@ -1,5 +1,5 @@
-import { useState, useEffect } from "react"; // Added useEffect if needed for formData sync
-import { Camera, Save, Loader2 } from "lucide-react"; // Added Loader2
+import { useState, useEffect, useRef } from "react";
+import { Camera, Save, Loader2, Cross, CrossIcon, Upload, Trash, Trash2 } from "lucide-react";
 import Header from "@/components/layout/Header";
 import Sidebar from "@/components/layout/Sidebar";
 import YDButton from "@/components/ui/YDButton";
@@ -8,12 +8,12 @@ import { useProfile, UserProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { useProgress } from "@/contexts/ProgressContext";
+import { supabase } from "@/integrations/supabase/client";
 
 const Profile = () => {
   const { profile, isLoading: isProfileLoading, updateProfile } = useProfile();
   const { user } = useAuth();
-  // Use the progress context
-  const { progressStats, isLoading: isProgressLoading } = useProgress();
+  const { progressStats, isLoading: isProgressLoadingStats } = useProgress();
 
   const [formData, setFormData] = useState<Partial<UserProfile> & { region?: string }>({
     name: "",
@@ -22,23 +22,6 @@ const Profile = () => {
     region: "North India", // Default or placeholder
   });
 
-  // Effect to update formData when profile loads/changes
-  useEffect(() => {
-    if (profile) {
-      setFormData(prev => ({
-        ...prev, // Keep existing region if not in profile
-        name: profile.name || "",
-        email: profile.email || user?.email || "",
-        role: profile.role || "learner",
-        // region: profile.region || prev.region || "North India", // Uncomment if region comes from profile
-      }));
-    } else if (user && !profile) {
-       // Set email from user if profile hasn't loaded yet but user exists
-       setFormData(prev => ({ ...prev, email: user.email || "" }));
-    }
-  }, [profile, user]); // Add user dependency
-
-
   const [passwordData, setPasswordData] = useState({
     currentPassword: "",
     newPassword: "",
@@ -46,39 +29,117 @@ const Profile = () => {
   });
 
   const [updating, setUpdating] = useState(false);
+  const [isUploadingPicture, setIsUploadingPicture] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // Handle form input changes
+  useEffect(() => {
+    if (profile) {
+      setFormData(prev => ({
+        ...prev,
+        name: profile.name || "",
+        email: profile.email || user?.email || "",
+        role: profile.role || "learner",
+      }));
+    } else if (user && !profile) {
+       setFormData(prev => ({ ...prev, email: user.email || "" }));
+    }
+  }, [profile, user]);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
-  // Handle password form input changes
   const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setPasswordData(prev => ({ ...prev, [name]: value }));
   };
 
-  // Update profile information
-  const handleSave = async () => {
-    if (!profile) return;
+  const handleAvatarClick = () => {
+    fileInputRef.current?.click();
+  };
 
-    setUpdating(true);
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (!event.target.files || event.target.files.length === 0) {
+      return;
+    }
+
+    const file = event.target.files[0];
+    const MAX_FILE_SIZE = 1 * 1024 * 1024; // 1 MB
+
+    if (file.size > MAX_FILE_SIZE) {
+      toast({
+        variant: "destructive",
+        title: "File Too Large",
+        description: "Please select a profile picture smaller than 1MB.",
+      });
+      return;
+    }
+
+    if (!user) {
+      toast({
+        variant: "destructive",
+        title: "Authentication Error",
+        description: "You must be logged in to upload a picture.",
+      });
+      return;
+    }
+
+    setIsUploadingPicture(true);
 
     try {
-      // Only update fields that exist in the profile update type
-      const updateData: Partial<Pick<UserProfile, 'name' /* add other updatable fields here like 'region' if applicable */>> = {};
+      const cleanFileName = file.name.replace(/[^a-zA-Z0-9-._]/g, '');
+      const filePath = `profile-picture/${user.id}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("profile-pictures")
+        .upload(filePath, file, {
+            cacheControl: '3600',
+            upsert: true,
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data: publicUrlData } = supabase.storage
+        .from("profile-pictures")
+        .getPublicUrl(filePath);
+      
+      if (!publicUrlData || !publicUrlData.publicUrl) {
+        throw new Error("Could not get public URL for the uploaded image.");
+      }
+      
+      await updateProfile({ 
+        profile_picture: publicUrlData.publicUrl,
+        updated_at: new Date().toISOString(),
+      });
+
+      toast({
+        title: "Success",
+        description: "Profile picture updated successfully.",
+      });
+    } catch (error: any) {
+      console.error("Error uploading profile picture:", error);
+      toast({ variant: "destructive", title: "Upload Failed", description: error.message || "There was a problem uploading your picture." });
+    } finally {
+      setIsUploadingPicture(false);
+    }
+  };
+  
+  const handleSave = async () => {
+    if (!profile) return;
+    setUpdating(true);
+    try {
+      const updateData: Partial<UserProfile> = {};
       if (formData.name !== profile.name) updateData.name = formData.name;
-      // if (formData.region !== profile.region) updateData.region = formData.region; // Add region if updatable
+      if (formData.region !== profile.region) updateData.region = formData.region; // <-- Add this line
 
       if (Object.keys(updateData).length === 0) {
-         toast({ title: "No changes detected."});
-         setUpdating(false);
-         return;
+        toast({ title: "No changes detected." });
+        setUpdating(false);
+        return;
       }
 
       const { error } = await updateProfile(updateData);
-
       if (error) throw error;
 
       toast({
@@ -97,7 +158,6 @@ const Profile = () => {
     }
   };
 
-  // Change password
   const handleChangePassword = async () => {
     if (passwordData.newPassword !== passwordData.confirmPassword) {
       toast({
@@ -107,7 +167,7 @@ const Profile = () => {
       });
       return;
     }
-     if (!passwordData.newPassword || passwordData.newPassword.length < 6) { // Example minimum length
+     if (!passwordData.newPassword || passwordData.newPassword.length < 6) {
       toast({
         variant: "destructive",
         title: "Invalid Password",
@@ -116,16 +176,12 @@ const Profile = () => {
       return;
      }
 
-    // TODO: Implement actual Supabase password update logic
-    // This would involve calling supabase.auth.updateUser({ password: passwordData.newPassword })
-    // You might need the current password for verification depending on your security settings
-    console.log("Password change data:", passwordData); // Placeholder
+    console.log("Password change data:", passwordData);
     toast({
-      title: "Password update initiated", // Adjust message as needed
-      description: "Check your email if confirmation is required.", // Adjust message
+      title: "Password update initiated",
+      description: "Check your email if confirmation is required.",
     });
 
-    // Reset password fields
     setPasswordData({
       currentPassword: "",
       newPassword: "",
@@ -133,7 +189,6 @@ const Profile = () => {
     });
   };
 
-   // Display loading state for the whole profile page if profile data is loading
   if (isProfileLoading) {
     return (
       <div className="flex h-screen bg-background">
@@ -150,15 +205,12 @@ const Profile = () => {
     );
   }
 
-  // Get initials from name for the avatar
   const getInitials = () => {
-    // Ensure formData.name is used as the fallback if profile isn't loaded yet but formData has it
     const nameToUse = profile?.name || formData.name;
     if (!nameToUse) return user?.email?.[0].toUpperCase() || 'U';
     return nameToUse.split(' ').map(n => n[0]).join('').toUpperCase();
   };
 
-  // Calculate percentages safely
   const calculatePercentage = (value: number, total: number): number => {
     return total > 0 ? Math.round((value / total) * 100) : 0;
   }
@@ -166,133 +218,132 @@ const Profile = () => {
   const moduleCompletionPercentage = calculatePercentage(progressStats.completedModules, progressStats.totalModules);
   const achievementUnlockPercentage = calculatePercentage(progressStats.unlockedAchievements, progressStats.totalAchievements);
 
-
   return (
     <div className="flex h-screen bg-background">
       <Sidebar />
-
       <div className="flex flex-col flex-1 overflow-hidden">
         <Header />
-
         <main className="flex-1 overflow-y-auto p-6">
           <div className="yd-container animate-fade-in">
             <h2 className="yd-section-title mb-6">Profile</h2>
-
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              {/* Profile sidebar */}
               <div className="md:col-span-1">
-                <YDCard className="text-center">
-                  {/* ... (Avatar section - no changes needed here) ... */}
+                <YDCard className="text-center p-6">
                   <div className="relative w-32 h-32 mx-auto mb-4">
-                      {profile?.profile_picture ? (
-                        <img
-                          src={profile.profile_picture}
-                          alt="Profile"
-                          className="w-full h-full rounded-full object-cover"
-                        />
-                      ) : (
-                        <div className="w-full h-full rounded-full bg-primary/20 flex items-center justify-center text-primary text-4xl font-medium">
-                          {getInitials()}
-                        </div>
-                      )}
-                      {/* TODO: Implement profile picture upload functionality */}
-                      <button className="absolute bottom-0 right-0 bg-primary text-white p-2 rounded-full hover:bg-primary/90">
-                        <Camera size={16} />
-                      </button>
+                    {profile?.profile_picture ? (
+                      <img
+                        src={profile?.profile_picture ? `${profile.profile_picture}?t=${Date.now()}` : undefined}
+                        alt="Profile"
+                        className="w-full h-full rounded-full object-cover"
+                      />
+                    ) : (
+                      <div className="w-full h-full rounded-full bg-primary/20 flex items-center justify-center text-primary text-4xl font-medium">
+                        {getInitials()}
+                      </div>
+                    )}
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      onChange={handleFileChange}
+                      className="hidden"
+                      accept="image/png, image/jpeg"
+                      disabled={isUploadingPicture}
+                    />
+                    <button
+                      onClick={handleAvatarClick}
+                      className="absolute bottom-0 right-0 bg-primary text-white p-2 rounded-full hover:bg-primary/90 disabled:bg-primary/70"
+                      disabled={isUploadingPicture}
+                      title="Change profile picture"
+                    >
+                      {isUploadingPicture ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />}
+                    </button>
+                    {/* TODO:ADD DELETE BUTTON */}
+                    {/* <button
+                      onClick={handleAvatarClick}
+                      className="absolute bottom-0 right-0 bg-primary text-white p-2 rounded-full hover:bg-primary/90 disabled:bg-primary/70"
+                      disabled={isUploadingPicture}
+                      title="Delete profile picture"
+                    >
+                      {isUploadingPicture ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
+                    </button> */}
+                  </div>
+                  <h3 className="text-xl font-semibold">{formData.name || 'User'}</h3>
+                  <p className="text-muted-foreground capitalize">{formData.role || 'Learner'}</p>
+                  <div className="border-t mt-4 pt-4">
+                    <div className="flex justify-between text-sm py-2">
+                      <span className="text-muted-foreground">Email</span>
+                      <span>{formData.email || 'Not available'}</span>
                     </div>
-
-                    <h3 className="text-xl font-semibold">{formData.name || 'User'}</h3>
-                    <p className="text-muted-foreground capitalize">{formData.role || 'Learner'}</p>
-
-                    <div className="border-t mt-4 pt-4">
-                      <div className="flex justify-between text-sm py-2">
-                        <span className="text-muted-foreground">Email</span>
-                        <span>{formData.email || 'Not available'}</span>
-                      </div>
-                      <div className="flex justify-between text-sm py-2">
-                        <span className="text-muted-foreground">Region</span>
-                        <span>{formData.region}</span> {/* Assuming region is in formData */}
-                      </div>
-                      <div className="flex justify-between text-sm py-2">
-                        <span className="text-muted-foreground">Joined</span>
-                        <span>
-                          {profile?.created_at
-                            ? new Date(profile.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-                            : 'Recent'}
-                        </span>
-                      </div>
+                    <div className="flex justify-between text-sm py-2">
+                      <span className="text-muted-foreground">Region</span>
+                      <span>{formData.region}</span>
                     </div>
+                    <div className="flex justify-between text-sm py-2">
+                      <span className="text-muted-foreground">Joined</span>
+                      <span>
+                        {profile?.created_at
+                          ? new Date(profile.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
+                          : 'Recent'}
+                      </span>
+                    </div>
+                  </div>
                 </YDCard>
-
-                {/* Progress summary - UPDATED SECTION */}
-                <YDCard className="mt-6">
+                <YDCard className="mt-6 p-6">
                   <h3 className="font-semibold mb-4">Learning Progress</h3>
-                   {isProgressLoading ? (
-                     <div className="space-y-4 p-4">
-                       <div className="h-4 bg-muted rounded w-3/4 animate-pulse"></div>
-                       <div className="h-2 bg-muted rounded w-full animate-pulse"></div>
-                       <div className="h-4 bg-muted rounded w-1/2 animate-pulse mt-2"></div>
-                       <div className="h-2 bg-muted rounded w-full animate-pulse"></div>
-                       <div className="h-4 bg-muted rounded w-2/3 animate-pulse mt-2"></div>
-                       <div className="h-2 bg-muted rounded w-full animate-pulse"></div>
-                     </div>
-                   ) : (
-                     <div className="space-y-4">
-                       {/* Overall Course Progress */}
-                       <div>
-                         <div className="flex justify-between mb-1">
-                           <span className="text-sm">Overall Progress</span>
-                           <span className="text-sm font-medium">{progressStats.moduleProgress}%</span>
-                         </div>
-                         <div className="w-full bg-muted rounded-full h-2">
-                           <div
-                             className="bg-primary rounded-full h-2"
-                             style={{ width: `${progressStats.moduleProgress}%` }} // Dynamic width
-                           ></div>
-                         </div>
-                       </div>
-
-                       {/* Modules Completed */}
-                       <div>
-                         <div className="flex justify-between mb-1">
-                           <span className="text-sm">Modules Completed</span>
-                           <span className="text-sm font-medium">
-                             {progressStats.completedModules}/{progressStats.totalModules}
-                           </span>
-                         </div>
-                         <div className="w-full bg-muted rounded-full h-2">
-                           <div
-                             className="bg-primary rounded-full h-2"
-                             style={{ width: `${moduleCompletionPercentage}%` }} // Dynamic width
-                           ></div>
-                         </div>
-                       </div>
-
-                       {/* Achievements Unlocked */}
-                       <div>
-                         <div className="flex justify-between mb-1">
-                           <span className="text-sm">Achievements Unlocked</span>
-                           <span className="text-sm font-medium">
-                             {progressStats.unlockedAchievements}/{progressStats.totalAchievements}
-                           </span>
-                         </div>
-                         <div className="w-full bg-muted rounded-full h-2">
-                           <div
-                             className="bg-primary rounded-full h-2"
-                             style={{ width: `${achievementUnlockPercentage}%` }} // Dynamic width
-                           ></div>
-                         </div>
-                       </div>
-                     </div>
-                   )}
+                  {isProgressLoadingStats ? (
+                    <div className="space-y-4 p-4">
+                      <div className="h-4 bg-muted rounded w-3/4 animate-pulse"></div>
+                      <div className="h-2 bg-muted rounded w-full animate-pulse"></div>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      <div>
+                        <div className="flex justify-between mb-1">
+                          <span className="text-sm">Overall Progress</span>
+                          <span className="text-sm font-medium">{progressStats.moduleProgress}%</span>
+                        </div>
+                        <div className="w-full bg-muted rounded-full h-2">
+                          <div
+                            className="bg-primary rounded-full h-2"
+                            style={{ width: `${progressStats.moduleProgress}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                      <div>
+                        <div className="flex justify-between mb-1">
+                          <span className="text-sm">Modules Completed</span>
+                          <span className="text-sm font-medium">
+                            {progressStats.completedModules}/{progressStats.totalModules}
+                          </span>
+                        </div>
+                        <div className="w-full bg-muted rounded-full h-2">
+                          <div
+                            className="bg-primary rounded-full h-2"
+                            style={{ width: `${moduleCompletionPercentage}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                      <div>
+                        <div className="flex justify-between mb-1">
+                          <span className="text-sm">Achievements Unlocked</span>
+                          <span className="text-sm font-medium">
+                            {progressStats.unlockedAchievements}/{progressStats.totalAchievements}
+                          </span>
+                        </div>
+                        <div className="w-full bg-muted rounded-full h-2">
+                          <div
+                            className="bg-primary rounded-full h-2"
+                            style={{ width: `${achievementUnlockPercentage}%` }}
+                          ></div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
                 </YDCard>
               </div>
-
-              {/* Profile settings */}
               <div className="md:col-span-2">
-                <YDCard>
+                <YDCard className="p-6">
                   <h3 className="font-semibold mb-6">Personal Information</h3>
-
                   <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
@@ -308,7 +359,6 @@ const Profile = () => {
                           className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         />
                       </div>
-
                       <div className="space-y-2">
                         <label htmlFor="email" className="block text-sm font-medium text-foreground">
                           Email Address
@@ -318,13 +368,10 @@ const Profile = () => {
                           name="email"
                           type="email"
                           value={formData.email}
-                          // Email changes require verification, typically done via Supabase Auth UI or specific flow
-                          // onChange={handleChange}
-                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
                           disabled
                         />
                       </div>
-
                       <div className="space-y-2">
                         <label htmlFor="role" className="block text-sm font-medium text-foreground">
                           Role
@@ -334,18 +381,15 @@ const Profile = () => {
                           name="role"
                           type="text"
                           value={formData.role}
-                          // Role changes might be admin-only
-                          // onChange={handleChange}
-                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-50"
+                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
                           disabled
                         />
                       </div>
-
                       <div className="space-y-2">
                         <label htmlFor="region" className="block text-sm font-medium text-foreground">
                           Region
                         </label>
-                        <select // Assuming region is editable, otherwise make it disabled like 'role'
+                        <select
                           id="region"
                           name="region"
                           value={formData.region}
@@ -360,7 +404,6 @@ const Profile = () => {
                         </select>
                       </div>
                     </div>
-
                     <div className="pt-4">
                       <YDButton type="submit" disabled={updating || isProfileLoading}>
                         {updating ? <Loader2 size={16} className="mr-2 animate-spin"/> : <Save size={16} className="mr-2" />}
@@ -369,13 +412,10 @@ const Profile = () => {
                     </div>
                   </form>
                 </YDCard>
-
-                <YDCard className="mt-6">
+                <YDCard className="mt-6 p-6">
                   <h3 className="font-semibold mb-6">Password</h3>
-
                   <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleChangePassword(); }}>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {/* Removed Current Password field - Supabase updateUser doesn't require it by default */}
                       <div className="space-y-2">
                         <label htmlFor="newPassword" className="block text-sm font-medium text-foreground">
                           New Password
@@ -390,7 +430,6 @@ const Profile = () => {
                           placeholder="••••••••"
                         />
                       </div>
-
                       <div className="space-y-2">
                          <label htmlFor="confirmPassword" className="block text-sm font-medium text-foreground">
                           Confirm New Password
@@ -406,7 +445,6 @@ const Profile = () => {
                         />
                       </div>
                     </div>
-
                     <div className="pt-4">
                       <YDButton variant="outline" type="submit">
                         Change Password

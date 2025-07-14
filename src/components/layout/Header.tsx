@@ -1,15 +1,27 @@
-
 import { Bell, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
+// Import your user/profile hook
+import { useProfile } from "@/hooks/useProfile"; // Adjust the import path as needed
+import { useIsMobile } from "@/hooks/use-mobile"; // Import useIsMobile
 
 interface HeaderProps {
   className?: string;
 }
 
 const Header = ({ className }: HeaderProps) => {
+  const { profile } = useProfile(); // Replace with your actual hook/context
+  const isMobile = useIsMobile(); // Determine if it's a mobile view
+
+  // Calculate dynamic left padding based on mobile state
+  // On mobile, if the sidebar button is fixed, we need extra padding.
+  // The button is `left-4` and is `h-10 w-10` (p-2 on a 20px icon results in ~36px-40px total width/height for the button itself)
+  // Let's ensure at least ~50-60px clearance on the left.
+  const mobileLeftPaddingClass = isMobile ? "pl-[60px]" : "pl-6"; // Use Tailwind's arbitrary value for precise control
+
   return (
     <header className={cn(
-      "w-full h-16 border-b bg-white flex items-center justify-between px-6",
+      "w-full h-16 border-b bg-white flex items-center justify-between px-6", // Base padding
+      mobileLeftPaddingClass, // Dynamic padding for mobile
       className
     )}>
       <div className="flex-1">
@@ -35,11 +47,28 @@ const Header = ({ className }: HeaderProps) => {
           <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-amber-500"></span>
         </button>
         <div className="flex items-center gap-3">
+          {/* Placeholder for user profile image or initials */}
           <div className="rounded-full bg-orange-500 h-8 w-8 flex items-center justify-center text-white font-medium">
-            YD
+            {profile?.profile_picture ? (
+              <img
+                src={
+                  profile?.profile_picture
+                    ? `${profile.profile_picture}${profile.updated_at ? `?v=${profile.updated_at}` : ''}`
+                    : undefined
+                }
+                alt="Profile"
+                className="w-full h-full rounded-full object-cover"
+              />
+            ) : (
+              <div className="w-full h-full rounded-full bg-primary/20 flex items-center justify-center text-primary text-4xl font-medium">
+                YD
+              </div>
+            )}
           </div>
           <div className="hidden md:block">
-            <p className="text-sm font-medium">Team Member</p>
+            <p className="text-sm font-medium">
+              {profile?.name || "Team Member"}
+            </p>
             <p className="text-xs text-muted-foreground">Yellow Diamond</p>
           </div>
         </div>
