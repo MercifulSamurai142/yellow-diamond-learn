@@ -1,27 +1,43 @@
-import { Bell, Search } from "lucide-react";
+// yellow-diamond-learn-main/src/components/layout/Header.tsx
+import { Bell, Search, Languages } from "lucide-react"; // Import Languages icon
 import { cn } from "@/lib/utils";
-// Import your user/profile hook
-import { useProfile } from "@/hooks/useProfile"; // Adjust the import path as needed
-import { useIsMobile } from "@/hooks/use-mobile"; // Import useIsMobile
+import { useProfile } from "@/hooks/useProfile";
+import { useIsMobile } from "@/hooks/use-mobile";
+import { useContext } from 'react';
+import { LanguageContext } from '@/contexts/LanguageContext';
+// Import DropdownMenu components instead of Select
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button"; // Re-using existing Button component for the trigger
 
 interface HeaderProps {
   className?: string;
 }
 
 const Header = ({ className }: HeaderProps) => {
-  const { profile } = useProfile(); // Replace with your actual hook/context
-  const isMobile = useIsMobile(); // Determine if it's a mobile view
+  const { profile } = useProfile();
+  const isMobile = useIsMobile();
+  const { currentLanguage, setLanguage } = useContext(LanguageContext)!;
 
-  // Calculate dynamic left padding based on mobile state
-  // On mobile, if the sidebar button is fixed, we need extra padding.
-  // The button is `left-4` and is `h-10 w-10` (p-2 on a 20px icon results in ~36px-40px total width/height for the button itself)
-  // Let's ensure at least ~50-60px clearance on the left.
-  const mobileLeftPaddingClass = isMobile ? "pl-[60px]" : "pl-6"; // Use Tailwind's arbitrary value for precise control
+  const mobileLeftPaddingClass = isMobile ? "pl-[60px]" : "pl-6";
+
+  const getLanguageLabel = (lang: string) => {
+    switch (lang) {
+      case 'english': return 'English';
+      case 'hindi': return 'हिन्दी';
+      case 'kannada': return 'ಕನ್ನಡ';
+      default: return 'Language';
+    }
+  };
 
   return (
     <header className={cn(
-      "w-full h-16 border-b bg-white flex items-center justify-between px-6", // Base padding
-      mobileLeftPaddingClass, // Dynamic padding for mobile
+      "w-full h-16 border-b bg-white flex items-center justify-between px-6",
+      mobileLeftPaddingClass,
       className
     )}>
       <div className="flex-1">
@@ -42,10 +58,35 @@ const Header = ({ className }: HeaderProps) => {
       </div>
       
       <div className="flex items-center gap-4">
-        <button className="relative rounded-full p-1 hover:bg-muted">
+        {/* Language Selector Dropdown Button */}
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            {/* Use a compact icon button */}
+            <Button variant="outline" size="icon" className="relative rounded-full">
+              <Languages size={20} className="text-muted-foreground" />
+              {/* Optional: Small indicator for current language if desired, e.g., first letter */}
+              <span className="absolute bottom-0 right-0 text-[10px] bg-primary text-primary-foreground rounded-full h-4 w-4 flex items-center justify-center -mb-1 -mr-1">
+                {getLanguageLabel(currentLanguage).substring(0,1)}
+              </span>
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end">
+            <DropdownMenuItem onClick={() => setLanguage('english')}>
+              English
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setLanguage('hindi')}>
+              हिन्दी (Hindi)
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => setLanguage('kannada')}>
+              ಕನ್ನಡ (Kannada)
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {/* <button className="relative rounded-full p-1 hover:bg-muted">
           <Bell size={20} className="text-muted-foreground" />
           <span className="absolute top-0 right-0 h-2 w-2 rounded-full bg-amber-500"></span>
-        </button>
+        </button> */}
         <div className="flex items-center gap-3">
           {/* Placeholder for user profile image or initials */}
           <div className="rounded-full bg-orange-500 h-8 w-8 flex items-center justify-center text-white font-medium">
