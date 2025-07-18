@@ -44,6 +44,67 @@ const Dashboard = () => {
   const isMobile = useIsMobile();
   const { currentLanguage } = useContext(LanguageContext)!; // Get currentLanguage from context
 
+  // Translation object structure
+  const translations = {
+    english: {
+      hello: "Hello",
+      welcomeTitle: "Welcome to Yellow Diamond Academy",
+      welcomeSubtitle: "Track your progress and continue your learning journey",
+      courseProgress: "Course Progress",
+      modulesCompleted: "Modules Completed",
+      yourModules: "Your Modules",
+      viewAllModules: "View all modules",
+      lessons: "lessons",
+      complete: "Complete",
+      startModule: "Start",
+      continueModule: "Continue",
+      reviewModule: "Review",
+      module: "Module",
+      noModulesAvailable: "No modules available for the selected language.",
+      errorTitle: "Error",
+      errorDescription: "Failed to load dashboard lists"
+    },
+    hindi: {
+      hello: "नमस्ते",
+      welcomeTitle: "यलो डायमंड एकेडमी में आपका स्वागत है",
+      welcomeSubtitle: "अपनी प्रगति को ट्रैक करें और अपनी सीखने की यात्रा जारी रखें",
+      courseProgress: "कोर्स प्रगति",
+      modulesCompleted: "मॉड्यूल पूर्ण",
+      yourModules: "आपके मॉड्यूल",
+      viewAllModules: "सभी मॉड्यूल देखें",
+      lessons: "पाठ",
+      complete: "पूर्ण",
+      startModule: "शुरू करें",
+      continueModule: "जारी रखें",
+      reviewModule: "समीक्षा",
+      module: "मॉड्यूल",
+      noModulesAvailable: "चयनित भाषा के लिए कोई मॉड्यूल उपलब्ध नहीं है।",
+      errorTitle: "त्रुटि",
+      errorDescription: "डैशबोर्ड सूची लोड करने में असफल"
+    },
+    kannada: {
+      hello: "ನಮಸ್ಕಾರ",
+      welcomeTitle: "ಯೆಲ್ಲೊ ಡೈಮಂಡ್ ಅಕಾಡೆಮಿಗೆ ಸ್ವಾಗತ",
+      welcomeSubtitle: "ನಿಮ್ಮ ಪ್ರಗತಿಯನ್ನು ಟ್ರ್ಯಾಕ್ ಮಾಡಿ ಮತ್ತು ನಿಮ್ಮ ಕಲಿಕೆಯ ಪ್ರಯಾಣವನ್ನು ಮುಂದುವರಿಸಿ",
+      courseProgress: "ಕೋರ್ಸ್ ಪ್ರಗತಿ",
+      modulesCompleted: "ಮಾಡ್ಯೂಲ್‌ಗಳು ಪೂರ್ಣಗೊಂಡಿವೆ",
+      yourModules: "ನಿಮ್ಮ ಮಾಡ್ಯೂಲ್‌ಗಳು",
+      viewAllModules: "ಎಲ್ಲಾ ಮಾಡ್ಯೂಲ್‌ಗಳನ್ನು ವೀಕ್ಷಿಸಿ",
+      lessons: "ಪಾಠಗಳು",
+      complete: "ಪೂರ್ಣ",
+      startModule: "ಪ್ರಾರಂಭಿಸಿ",
+      continueModule: "ಮುಂದುವರಿಸಿ",
+      reviewModule: "ಪರಿಶೀಲನೆ",
+      module: "ಮಾಡ್ಯೂಲ್",
+      noModulesAvailable: "ಆಯ್ಕೆಮಾಡಿದ ಭಾಷೆಗಾಗಿ ಯಾವುದೇ ಮಾಡ್ಯೂಲ್‌ಗಳು ಲಭ್ಯವಿಲ್ಲ.",
+      errorTitle: "ದೋಷ",
+      errorDescription: "ಡ್ಯಾಶ್‌ಬೋರ್ಡ್ ಪಟ್ಟಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ವಿಫಲವಾಗಿದೆ"
+    }
+  };
+
+  // Get current language translations
+  const t = translations[currentLanguage] || translations.english;
+
   useEffect(() => {
     if (!user) {
       setIsListLoading(false);
@@ -138,8 +199,8 @@ const Dashboard = () => {
         console.error('Error fetching dashboard list data:', error);
         toast({
           variant: "destructive",
-          title: "Error",
-          description: "Failed to load dashboard lists"
+          title: t.errorTitle,
+          description: t.errorDescription
         });
         setModules([]);
       } finally {
@@ -148,7 +209,7 @@ const Dashboard = () => {
     };
 
     fetchListData();
-  }, [user, currentLanguage]); // Re-run effect when currentLanguage changes
+  }, [user, currentLanguage, t.errorTitle, t.errorDescription]); // Re-run effect when currentLanguage changes
 
   const findContinueModule = () => {
     const inProgressModules = modules.filter(m => m.status === "in-progress");
@@ -181,9 +242,12 @@ const Dashboard = () => {
 
           <div className={cn("animate-fade-in", isMobile ? "px-4" : "yd-container")}>
             <div className="flex justify-between items-center mb-8">
-              <h2 className="text-2xl font-semibold text-orange-600">Welcome to Yellow Diamond Academy</h2>
-              <p className="text-slate-500">Track your progress and continue your learning journey</p>
+              <h2 className="text-2xl font-semibold text-orange-600">{t.welcomeTitle}</h2>
+              <p className="text-slate-500">{t.welcomeSubtitle}</p>
             </div>
+
+            {/* Hello greeting */}
+            <div className="text-lg mb-4 text-foreground">{t.hello}</div>
 
             {showOverallLoading ? (
               <div className="flex items-center justify-center h-64">
@@ -200,7 +264,7 @@ const Dashboard = () => {
                         <BookOpen size={24} className="text-primary" />
                       </div>
                       <div>
-                        <p className="text-foreground text-sm">Course Progress</p>
+                        <p className="text-foreground text-sm">{t.courseProgress}</p>
                         <p className="text-2xl font-semibold">{progressStats.moduleProgress}%</p>
                       </div>
                     </div>
@@ -212,7 +276,7 @@ const Dashboard = () => {
                         <CheckCircle size={24} className="text-green-500" />
                       </div>
                       <div>
-                        <p className="text-foreground text-sm">Modules Completed</p>
+                        <p className="text-foreground text-sm">{t.modulesCompleted}</p>
                         <p className="text-2xl font-semibold">{progressStats.completedModules}/{progressStats.totalModules}</p>
                       </div>
                     </div>
@@ -222,9 +286,9 @@ const Dashboard = () => {
                 {/* Modules - Uses local 'modules' state (already filtered by language) */}
                 <div className="mb-8">
                   <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-xl font-medium text-foreground">Your Modules</h3>
+                    <h3 className="text-xl font-medium text-foreground">{t.yourModules}</h3>
                     <Link to="/modules" className="text-sm text-primary flex items-center hover:underline">
-                      View all modules <ChevronRight size={16} />
+                      {t.viewAllModules} <ChevronRight size={16} />
                     </Link>
                   </div>
 
@@ -242,8 +306,8 @@ const Dashboard = () => {
                           </YDCardHeader>
                           <YDCardContent className="mt-auto">
                             <div className="flex items-center justify-between mb-1">
-                              <span className="text-sm text-muted-foreground">{module.progress}% Complete</span>
-                              <span className="text-sm text-muted-foreground">{module.lessons} lessons</span>
+                              <span className="text-sm text-muted-foreground">{module.progress}% {t.complete}</span>
+                              <span className="text-sm text-muted-foreground">{module.lessons} {t.lessons}</span>
                             </div>
                             <div className="w-full bg-muted rounded-full h-2 mt-1">
                               <div
@@ -255,7 +319,7 @@ const Dashboard = () => {
                           <YDCardFooter className="mt-auto">
                             <Link to={`/modules/${module.id}`} className="w-full">
                               <YDButton variant="default" className="w-full">
-                                {module.status === 'completed' ? "Review" : module.status === 'in-progress' ? "Continue" : "Start"} Module
+                                {module.status === 'completed' ? t.reviewModule : module.status === 'in-progress' ? t.continueModule : t.startModule} {t.module}
                               </YDButton>
                             </Link>
                           </YDCardFooter>
@@ -263,7 +327,7 @@ const Dashboard = () => {
                       ))}
                     </div>
                   ) : (
-                     <p className="text-muted-foreground">No modules available for the selected language.</p>
+                     <p className="text-muted-foreground">{t.noModulesAvailable}</p>
                   )}
                 </div>
               </>

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef,useContext } from "react";
 import { Camera, Save, Loader2, Cross, CrossIcon, Upload, Trash, Trash2 } from "lucide-react";
 import Header from "@/components/layout/Header";
 import Sidebar from "@/components/layout/Sidebar";
@@ -8,12 +8,102 @@ import { useProfile, UserProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { useProgress } from "@/contexts/ProgressContext";
+import { LanguageContext } from "@/contexts/LanguageContext"; // Add this import
 import { supabase } from "@/integrations/supabase/client";
+
+// Translation object
+const translations = {
+  english: {
+    hello: "Hello",
+    profile: "Profile",
+    personalInformation: "Personal Information",
+    fullName: "Full Name",
+    emailAddress: "Email Address",
+    role: "Role",
+    region: "Region",
+    email: "Email",
+    joined: "Joined",
+    learningProgress: "Learning Progress",
+    overallProgress: "Overall Progress",
+    modulesCompleted: "Modules Completed",
+    achievementsUnlocked: "Achievements Unlocked",
+    password: "Password",
+    newPassword: "New Password",
+    confirmNewPassword: "Confirm New Password",
+    changePassword: "Change Password",
+    saveChanges: "Save Changes",
+    saving: "Saving...",
+    user: "User",
+    learner: "Learner",
+    notAvailable: "Not available",
+    recent: "Recent",
+    changeProfilePicture: "Change profile picture",
+    deleteProfilePicture: "Delete profile picture"
+  },
+  hindi: {
+    hello: "नमस्ते",
+    profile: "प्रोफाइल",
+    personalInformation: "व्यक्तिगत जानकारी",
+    fullName: "पूरा नाम",
+    emailAddress: "ईमेल पता",
+    role: "भूमिका",
+    region: "क्षेत्र",
+    email: "ईमेल",
+    joined: "शामिल हुआ",
+    learningProgress: "सीखने की प्रगति",
+    overallProgress: "समग्र प्रगति",
+    modulesCompleted: "मॉड्यूल पूरे किए गए",
+    achievementsUnlocked: "उपलब्धियां अनलॉक की गईं",
+    password: "पासवर्ड",
+    newPassword: "नया पासवर्ड",
+    confirmNewPassword: "नए पासवर्ड की पुष्टि करें",
+    changePassword: "पासवर्ड बदलें",
+    saveChanges: "परिवर्तन सहेजें",
+    saving: "सहेज रहा है...",
+    user: "उपयोगकर्ता",
+    learner: "शिक्षार्थी",
+    notAvailable: "उपलब्ध नहीं",
+    recent: "हाल ही में",
+    changeProfilePicture: "प्रोफाइल चित्र बदलें",
+    deleteProfilePicture: "प्रोफाइल चित्र हटाएं"
+  },
+  kannada: {
+    hello: "ನಮಸ್ಕಾರ",
+    profile: "ಪ್ರೊಫೈಲ್",
+    personalInformation: "ವೈಯಕ್ತಿಕ ಮಾಹಿತಿ",
+    fullName: "ಪೂರ್ಣ ಹೆಸರು",
+    emailAddress: "ಇಮೇಲ್ ವಿಳಾಸ",
+    role: "ಪಾತ್ರ",
+    region: "ಪ್ರದೇಶ",
+    email: "ಇಮೇಲ್",
+    joined: "ಸೇರಿದರು",
+    learningProgress: "ಕಲಿಕೆಯ ಪ್ರಗತಿ",
+    overallProgress: "ಒಟ್ಟಾರೆ ಪ್ರಗತಿ",
+    modulesCompleted: "ಮಾಡ್ಯೂಲ್‌ಗಳು ಪೂರ್ಣಗೊಂಡಿವೆ",
+    achievementsUnlocked: "ಸಾಧನೆಗಳನ್ನು ಅನ್‌ಲಾಕ್ ಮಾಡಲಾಗಿದೆ",
+    password: "ಪಾಸ್‌ವರ್ಡ್",
+    newPassword: "ಹೊಸ ಪಾಸ್‌ವರ್ಡ್",
+    confirmNewPassword: "ಹೊಸ ಪಾಸ್‌ವರ್ಡ್ ದೃಢೀಕರಿಸಿ",
+    changePassword: "ಪಾಸ್‌ವರ್ಡ್ ಬದಲಾಯಿಸಿ",
+    saveChanges: "ಬದಲಾವಣೆಗಳನ್ನು ಉಳಿಸಿ",
+    saving: "ಉಳಿಸುತ್ತಿದೆ...",
+    user: "ಬಳಕೆದಾರ",
+    learner: "ಕಲಿಯುವವರು",
+    notAvailable: "ಲಭ್ಯವಿಲ್ಲ",
+    recent: "ಇತ್ತೀಚಿನ",
+    changeProfilePicture: "ಪ್ರೊಫೈಲ್ ಚಿತ್ರವನ್ನು ಬದಲಾಯಿಸಿ",
+    deleteProfilePicture: "ಪ್ರೊಫೈಲ್ ಚಿತ್ರವನ್ನು ಅಳಿಸಿ"
+  }
+};
 
 const Profile = () => {
   const { profile, isLoading: isProfileLoading, updateProfile } = useProfile();
   const { user } = useAuth();
   const { progressStats, isLoading: isProgressLoadingStats } = useProgress();
+  const { currentLanguage } = useContext(LanguageContext)!; // Add this hook
+
+  // Get current translations based on selected language
+  const t = translations[currentLanguage] || translations.english;
 
   const [formData, setFormData] = useState<Partial<UserProfile> & { region?: string }>({
     name: "",
@@ -132,7 +222,7 @@ const Profile = () => {
     try {
       const updateData: Partial<UserProfile> = {};
       if (formData.name !== profile.name) updateData.name = formData.name;
-      if (formData.region !== profile.region) updateData.region = formData.region; // <-- Add this line
+      if (formData.region !== profile.region) updateData.region = formData.region;
 
       if (Object.keys(updateData).length === 0) {
         toast({ title: "No changes detected." });
@@ -226,7 +316,11 @@ const Profile = () => {
         <Header />
         <main className="flex-1 overflow-y-auto p-6">
           <div className="yd-container animate-fade-in">
-            <h2 className="yd-section-title mb-6">Profile</h2>
+            {/* Display hello message in selected language */}
+            <div className="mb-4 text-lg font-medium text-primary">
+              {t.hello}!
+            </div>
+            <h2 className="yd-section-title mb-6">{t.profile}</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="md:col-span-1">
                 <YDCard className="text-center p-6">
@@ -254,43 +348,34 @@ const Profile = () => {
                       onClick={handleAvatarClick}
                       className="absolute bottom-0 right-0 bg-primary text-white p-2 rounded-full hover:bg-primary/90 disabled:bg-primary/70"
                       disabled={isUploadingPicture}
-                      title="Change profile picture"
+                      title={t.changeProfilePicture}
                     >
                       {isUploadingPicture ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />}
                     </button>
-                    {/* TODO:ADD DELETE BUTTON */}
-                    {/* <button
-                      onClick={handleAvatarClick}
-                      className="absolute bottom-0 right-0 bg-primary text-white p-2 rounded-full hover:bg-primary/90 disabled:bg-primary/70"
-                      disabled={isUploadingPicture}
-                      title="Delete profile picture"
-                    >
-                      {isUploadingPicture ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                    </button> */}
                   </div>
-                  <h3 className="text-xl font-semibold">{formData.name || 'User'}</h3>
-                  <p className="text-muted-foreground capitalize">{formData.role || 'Learner'}</p>
+                  <h3 className="text-xl font-semibold">{formData.name || t.user}</h3>
+                  <p className="text-muted-foreground capitalize">{formData.role || t.learner}</p>
                   <div className="border-t mt-4 pt-4">
                     <div className="flex justify-between text-sm py-2">
-                      <span className="text-muted-foreground">Email</span>
-                      <span>{formData.email || 'Not available'}</span>
+                      <span className="text-muted-foreground">{t.email}</span>
+                      <span>{formData.email || t.notAvailable}</span>
                     </div>
                     <div className="flex justify-between text-sm py-2">
-                      <span className="text-muted-foreground">Region</span>
+                      <span className="text-muted-foreground">{t.region}</span>
                       <span>{formData.region}</span>
                     </div>
                     <div className="flex justify-between text-sm py-2">
-                      <span className="text-muted-foreground">Joined</span>
+                      <span className="text-muted-foreground">{t.joined}</span>
                       <span>
                         {profile?.created_at
                           ? new Date(profile.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-                          : 'Recent'}
+                          : t.recent}
                       </span>
                     </div>
                   </div>
                 </YDCard>
                 <YDCard className="mt-6 p-6">
-                  <h3 className="font-semibold mb-4">Learning Progress</h3>
+                  <h3 className="font-semibold mb-4">{t.learningProgress}</h3>
                   {isProgressLoadingStats ? (
                     <div className="space-y-4 p-4">
                       <div className="h-4 bg-muted rounded w-3/4 animate-pulse"></div>
@@ -300,7 +385,7 @@ const Profile = () => {
                     <div className="space-y-4">
                       <div>
                         <div className="flex justify-between mb-1">
-                          <span className="text-sm">Overall Progress</span>
+                          <span className="text-sm">{t.overallProgress}</span>
                           <span className="text-sm font-medium">{progressStats.moduleProgress}%</span>
                         </div>
                         <div className="w-full bg-muted rounded-full h-2">
@@ -312,7 +397,7 @@ const Profile = () => {
                       </div>
                       <div>
                         <div className="flex justify-between mb-1">
-                          <span className="text-sm">Modules Completed</span>
+                          <span className="text-sm">{t.modulesCompleted}</span>
                           <span className="text-sm font-medium">
                             {progressStats.completedModules}/{progressStats.totalModules}
                           </span>
@@ -326,7 +411,7 @@ const Profile = () => {
                       </div>
                       <div>
                         <div className="flex justify-between mb-1">
-                          <span className="text-sm">Achievements Unlocked</span>
+                          <span className="text-sm">{t.achievementsUnlocked}</span>
                           <span className="text-sm font-medium">
                             {progressStats.unlockedAchievements}/{progressStats.totalAchievements}
                           </span>
@@ -344,12 +429,12 @@ const Profile = () => {
               </div>
               <div className="md:col-span-2">
                 <YDCard className="p-6">
-                  <h3 className="font-semibold mb-6">Personal Information</h3>
+                  <h3 className="font-semibold mb-6">{t.personalInformation}</h3>
                   <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <label htmlFor="name" className="block text-sm font-medium text-foreground">
-                          Full Name
+                          {t.fullName}
                         </label>
                         <input
                           id="name"
@@ -362,7 +447,7 @@ const Profile = () => {
                       </div>
                       <div className="space-y-2">
                         <label htmlFor="email" className="block text-sm font-medium text-foreground">
-                          Email Address
+                          {t.emailAddress}
                         </label>
                         <input
                           id="email"
@@ -375,7 +460,7 @@ const Profile = () => {
                       </div>
                       <div className="space-y-2">
                         <label htmlFor="role" className="block text-sm font-medium text-foreground">
-                          Role
+                          {t.role}
                         </label>
                         <input
                           id="role"
@@ -388,7 +473,7 @@ const Profile = () => {
                       </div>
                       <div className="space-y-2">
                         <label htmlFor="region" className="block text-sm font-medium text-foreground">
-                          Region
+                          {t.region}
                         </label>
                         <select
                           id="region"
@@ -408,18 +493,18 @@ const Profile = () => {
                     <div className="pt-4">
                       <YDButton type="submit" disabled={updating || isProfileLoading}>
                         {updating ? <Loader2 size={16} className="mr-2 animate-spin"/> : <Save size={16} className="mr-2" />}
-                        {updating ? "Saving..." : "Save Changes"}
+                        {updating ? t.saving : t.saveChanges}
                       </YDButton>
                     </div>
                   </form>
                 </YDCard>
                 <YDCard className="mt-6 p-6">
-                  <h3 className="font-semibold mb-6">Password</h3>
+                  <h3 className="font-semibold mb-6">{t.password}</h3>
                   <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleChangePassword(); }}>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <label htmlFor="newPassword" className="block text-sm font-medium text-foreground">
-                          New Password
+                          {t.newPassword}
                         </label>
                         <input
                           id="newPassword"
@@ -433,7 +518,7 @@ const Profile = () => {
                       </div>
                       <div className="space-y-2">
                          <label htmlFor="confirmPassword" className="block text-sm font-medium text-foreground">
-                          Confirm New Password
+                          {t.confirmNewPassword}
                         </label>
                         <input
                           id="confirmPassword"
@@ -448,7 +533,7 @@ const Profile = () => {
                     </div>
                     <div className="pt-4">
                       <YDButton variant="outline" type="submit">
-                        Change Password
+                        {t.changePassword}
                       </YDButton>
                     </div>
                   </form>
