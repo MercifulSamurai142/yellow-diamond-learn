@@ -235,12 +235,12 @@ const Dashboard = () => {
                   ) : modules.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {modules.map((module) => (
-                        <YDCard key={module.id} className="hover:border-primary transition-colors">
+                        <YDCard key={module.id} className="hover:border-primary transition-colors flex flex-col h-full">
                           <YDCardHeader>
                             <YDCardTitle>{module.name}</YDCardTitle>
                             <YDCardDescription>{module.description}</YDCardDescription>
                           </YDCardHeader>
-                          <YDCardContent>
+                          <YDCardContent className="mt-auto">
                             <div className="flex items-center justify-between mb-1">
                               <span className="text-sm text-muted-foreground">{module.progress}% Complete</span>
                               <span className="text-sm text-muted-foreground">{module.lessons} lessons</span>
@@ -252,7 +252,7 @@ const Dashboard = () => {
                               ></div>
                             </div>
                           </YDCardContent>
-                          <YDCardFooter>
+                          <YDCardFooter className="mt-auto">
                             <Link to={`/modules/${module.id}`} className="w-full">
                               <YDButton variant="default" className="w-full">
                                 {module.status === 'completed' ? "Review" : module.status === 'in-progress' ? "Continue" : "Start"} Module

@@ -282,7 +282,7 @@ const LessonDetail = () => {
                   </video>
                 </div>
               ) : null}
-            <YDCard className="mb-8 overflow-hidden rounded-none md:rounded-lg">
+            <YDCard className="mb-8 p-0 overflow-hidden rounded-none md:rounded-lg">
               <div className={cn(isMobile ? "p-0" : "p-6")}>
                 {lesson.content ? (
                   <div className="prose dark:prose-invert max-w-full">
