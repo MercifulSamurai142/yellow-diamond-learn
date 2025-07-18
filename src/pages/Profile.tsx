@@ -39,6 +39,7 @@ const Profile = () => {
         name: profile.name || "",
         email: profile.email || user?.email || "",
         role: profile.role || "learner",
+        region: profile.region || ""
       }));
     } else if (user && !profile) {
        setFormData(prev => ({ ...prev, email: user.email || "" }));
