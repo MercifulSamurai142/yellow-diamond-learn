@@ -32,7 +32,6 @@ const Sidebar = ({ className }: SidebarProps) => {
   // Translation object structure
   const translations = {
     english: {
-      hello: "Hello",
       companyName: "Yellow Diamond",
       dashboard: "Dashboard",
       modules: "Modules",
@@ -44,7 +43,6 @@ const Sidebar = ({ className }: SidebarProps) => {
       logout: "Logout"
     },
     hindi: {
-      hello: "नमस्ते",
       companyName: "यलो डायमंड",
       dashboard: "डैशबोर्ड",
       modules: "मॉड्यूल",
@@ -56,7 +54,6 @@ const Sidebar = ({ className }: SidebarProps) => {
       logout: "लॉग आउट"
     },
     kannada: {
-      hello: "ನಮಸ್ಕಾರ",
       companyName: "ಯೆಲ್ಲೊ ಡೈಮಂಡ್",
       dashboard: "ಡ್ಯಾಶ್‌ಬೋರ್ಡ್",
       modules: "ಮಾಡ್ಯೂಲ್‌ಗಳು",
@@ -124,12 +121,7 @@ const Sidebar = ({ className }: SidebarProps) => {
         )}
       </div>
 
-      {/* Hello greeting */}
-      {!collapsed && (
-        <div className="px-4 py-2 text-sm text-sidebar-foreground/80">
-          {t.hello}
-        </div>
-      )}
+      
 
       <nav className="flex-1 overflow-y-auto py-4">
         <ul className="space-y-1 px-2">

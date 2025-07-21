@@ -14,7 +14,6 @@ import { supabase } from "@/integrations/supabase/client";
 // Translation object
 const translations = {
   english: {
-    hello: "Hello",
     profile: "Profile",
     personalInformation: "Personal Information",
     fullName: "Full Name",
@@ -41,7 +40,6 @@ const translations = {
     deleteProfilePicture: "Delete profile picture"
   },
   hindi: {
-    hello: "नमस्ते",
     profile: "प्रोफाइल",
     personalInformation: "व्यक्तिगत जानकारी",
     fullName: "पूरा नाम",
@@ -68,7 +66,6 @@ const translations = {
     deleteProfilePicture: "प्रोफाइल चित्र हटाएं"
   },
   kannada: {
-    hello: "ನಮಸ್ಕಾರ",
     profile: "ಪ್ರೊಫೈಲ್",
     personalInformation: "ವೈಯಕ್ತಿಕ ಮಾಹಿತಿ",
     fullName: "ಪೂರ್ಣ ಹೆಸರು",
@@ -317,9 +314,7 @@ const Profile = () => {
         <main className="flex-1 overflow-y-auto p-6">
           <div className="yd-container animate-fade-in">
             {/* Display hello message in selected language */}
-            <div className="mb-4 text-lg font-medium text-primary">
-              {t.hello}!
-            </div>
+            
             <h2 className="yd-section-title mb-6">{t.profile}</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="md:col-span-1">

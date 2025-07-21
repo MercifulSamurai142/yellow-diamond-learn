@@ -11,7 +11,6 @@ const HeroBanner = () => {
   // Translation object structure
   const translations = {
     english: {
-      hello: "Hello",
       academyName: "Yellow Diamond Academy",
       mainTitle: "Master FMCG Sales &",
       mainTitleSecond: "Distribution",
@@ -24,7 +23,6 @@ const HeroBanner = () => {
       industryRecognized: "Industry Recognized"
     },
     hindi: {
-      hello: "नमस्ते",
       academyName: "यलो डायमंड एकेडमी",
       mainTitle: "एफएमसीजी सेल्स और",
       mainTitleSecond: "वितरण में निपुणता",
@@ -37,7 +35,6 @@ const HeroBanner = () => {
       industryRecognized: "उद्योग मान्यता प्राप्त"
     },
     kannada: {
-      hello: "ನಮಸ್ಕಾರ",
       academyName: "ಯೆಲ್ಲೊ ಡೈಮಂಡ್ ಅಕಾಡೆಮಿ",
       mainTitle: "ಎಫ್‌ಎಮ್‌ಸಿಜಿ ಮಾರಾಟ ಮತ್ತು",
       mainTitleSecond: "ವಿತರಣೆಯಲ್ಲಿ ಪ್ರಾವೀಣ್ಯತೆ",

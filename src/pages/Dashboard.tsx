@@ -47,7 +47,6 @@ const Dashboard = () => {
   // Translation object structure
   const translations = {
     english: {
-      hello: "Hello",
       welcomeTitle: "Welcome to Yellow Diamond Academy",
       welcomeSubtitle: "Track your progress and continue your learning journey",
       courseProgress: "Course Progress",
@@ -65,7 +64,6 @@ const Dashboard = () => {
       errorDescription: "Failed to load dashboard lists"
     },
     hindi: {
-      hello: "नमस्ते",
       welcomeTitle: "यलो डायमंड एकेडमी में आपका स्वागत है",
       welcomeSubtitle: "अपनी प्रगति को ट्रैक करें और अपनी सीखने की यात्रा जारी रखें",
       courseProgress: "कोर्स प्रगति",
@@ -83,7 +81,6 @@ const Dashboard = () => {
       errorDescription: "डैशबोर्ड सूची लोड करने में असफल"
     },
     kannada: {
-      hello: "ನಮಸ್ಕಾರ",
       welcomeTitle: "ಯೆಲ್ಲೊ ಡೈಮಂಡ್ ಅಕಾಡೆಮಿಗೆ ಸ್ವಾಗತ",
       welcomeSubtitle: "ನಿಮ್ಮ ಪ್ರಗತಿಯನ್ನು ಟ್ರ್ಯಾಕ್ ಮಾಡಿ ಮತ್ತು ನಿಮ್ಮ ಕಲಿಕೆಯ ಪ್ರಯಾಣವನ್ನು ಮುಂದುವರಿಸಿ",
       courseProgress: "ಕೋರ್ಸ್ ಪ್ರಗತಿ",
@@ -246,8 +243,7 @@ const Dashboard = () => {
               <p className="text-slate-500">{t.welcomeSubtitle}</p>
             </div>
 
-            {/* Hello greeting */}
-            <div className="text-lg mb-4 text-foreground">{t.hello}</div>
+            
 
             {showOverallLoading ? (
               <div className="flex items-center justify-center h-64">
