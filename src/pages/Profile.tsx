@@ -404,20 +404,7 @@ const Profile = () => {
                           ></div>
                         </div>
                       </div>
-                      <div>
-                        <div className="flex justify-between mb-1">
-                          <span className="text-sm">{t.achievementsUnlocked}</span>
-                          <span className="text-sm font-medium">
-                            {progressStats.unlockedAchievements}/{progressStats.totalAchievements}
-                          </span>
-                        </div>
-                        <div className="w-full bg-muted rounded-full h-2">
-                          <div
-                            className="bg-primary rounded-full h-2"
-                            style={{ width: `${achievementUnlockPercentage}%` }}
-                          ></div>
-                        </div>
-                      </div>
+                      
                     </div>
                   )}
                 </YDCard>
