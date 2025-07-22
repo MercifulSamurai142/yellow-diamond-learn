@@ -1,5 +1,5 @@
-
-import { useEffect, useState } from "react";
+// yellow-diamond-learn-main/src/pages/Progress.tsx
+import { useEffect, useState, useContext } from "react";
 import Header from "@/components/layout/Header";
 import Sidebar from "@/components/layout/Sidebar";
 import { YDCard } from "@/components/ui/YDCard";
@@ -9,6 +9,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Progress } from "@/components/ui/progress";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { toast } from "@/hooks/use-toast";
+import { LanguageContext } from "@/contexts/LanguageContext";
 
 type ModuleProgress = {
   id: string;
@@ -34,40 +35,98 @@ const ProgressPage = () => {
   const [overallProgress, setOverallProgress] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const { user } = useAuth();
+  const { currentLanguage } = useContext(LanguageContext)!;
+
+  // Translation object structure
+  const translations = {
+    english: {
+      yourLearningProgress: "Your Learning Progress",
+      trackPerformance: "Track your performance across all modules and lessons",
+      overallCourseProgress: "Overall Course Progress",
+      modulesCompletedIn: "modules completed in",
+      moduleCompletionProgress: "Module Completion Progress",
+      quizPerformanceByModule: "Quiz Performance by Module",
+      lessonsCompleted: "lessons completed",
+      quizScore: "Quiz score",
+      noModulesAvailable: "No modules available for the selected language.",
+      errorLoadingProgress: "Error loading progress data",
+      pleaseRefresh: "Please try refreshing the page"
+    },
+    hindi: {
+      yourLearningProgress: "आपकी सीखने की प्रगति",
+      trackPerformance: "सभी मॉड्यूल और पाठों में अपने प्रदर्शन को ट्रैक करें",
+      overallCourseProgress: "समग्र पाठ्यक्रम प्रगति",
+      modulesCompletedIn: "मॉड्यूल पूरे किए गए",
+      moduleCompletionProgress: "मॉड्यूल पूर्णता प्रगति",
+      quizPerformanceByModule: "मॉड्यूल द्वारा क्विज प्रदर्शन",
+      lessonsCompleted: "पाठ पूरे किए गए",
+      quizScore: "क्विज स्कोर",
+      noModulesAvailable: "चयनित भाषा के लिए कोई मॉड्यूल उपलब्ध नहीं है।",
+      errorLoadingProgress: "प्रगति डेटा लोड करने में त्रुटि",
+      pleaseRefresh: "कृपया पृष्ठ को ताज़ा करने का प्रयास करें"
+    },
+    kannada: {
+      yourLearningProgress: "ನಿಮ್ಮ ಕಲಿಕೆಯ ಪ್ರಗತಿ",
+      trackPerformance: "ಎಲ್ಲಾ ಮಾಡ್ಯೂಲ್‌ಗಳು ಮತ್ತು ಪಾಠಗಳಾದ್ಯಂತ ನಿಮ್ಮ ಕಾರ್ಯಕ್ಷಮತೆಯನ್ನು ಟ್ರ್ಯಾಕ್ ಮಾಡಿ",
+      overallCourseProgress: "ಒಟ್ಟಾರೆ ಕೋರ್ಸ್ ಪ್ರಗತಿ",
+      modulesCompletedIn: "ಮಾಡ್ಯೂಲ್‌ಗಳು ಪೂರ್ಣಗೊಂಡಿವೆ",
+      moduleCompletionProgress: "ಮಾಡ್ಯೂಲ್ ಪೂರ್ಣಗೊಳಿಸುವಿಕೆ ಪ್ರಗತಿ",
+      quizPerformanceByModule: "ಮಾಡ್ಯೂಲ್ ಮೂಲಕ ರಸಪ್ರಶ್ನೆ ಕಾರ್ಯಕ್ಷಮತೆ",
+      lessonsCompleted: "ಪಾಠಗಳು ಪೂರ್ಣಗೊಂಡಿವೆ",
+      quizScore: "ರಸಪ್ರಶ್ನೆ ಅಂಕ",
+      noModulesAvailable: "ಆಯ್ಕೆಮಾಡಿದ ಭಾಷೆಗಾಗಿ ಯಾವುದೇ ಮಾಡ್ಯೂಲ್‌ಗಳು ಲಭ್ಯವಿಲ್ಲ.",
+      errorLoadingProgress: "ಪ್ರಗತಿ ಡೇಟಾವನ್ನು ಲೋಡ್ ಮಾಡುವಲ್ಲಿ ದೋಷ",
+      pleaseRefresh: "ದಯವಿಟ್ಟು ಪುಟವನ್ನು ರಿಫ್ರೆಶ್ ಮಾಡಲು ಪ್ರಯತ್ನಿಸಿ"
+    }
+  };
+
+  // Get current language translations
+  const t = translations[currentLanguage] || translations.english;
 
   useEffect(() => {
     const fetchProgress = async () => {
-      if (!user) return;
+      if (!user) {
+        setIsLoading(false);
+        setModulesProgress([]);
+        setOverallProgress(0);
+        return;
+      }
       
       try {
         setIsLoading(true);
         
-        // Get all modules
         const { data: modulesData, error: modulesError } = await supabase
           .from('modules')
           .select('id, name, order, description')
+          .eq('language', currentLanguage)
           .order('order');
 
         if (modulesError) throw modulesError;
         
-        // For each module, get its lessons and the user's progress
-        const moduleProgressPromises = modulesData.map(async (module) => {
-          // Get lessons for this module
+        const validModulesData = modulesData || [];
+
+        if (validModulesData.length === 0) {
+            setModulesProgress([]);
+            setOverallProgress(0);
+            setIsLoading(false);
+            return;
+        }
+
+        const moduleProgressPromises = validModulesData.map(async (module) => {
           const { data: lessonsData, error: lessonsError } = await supabase
             .from('lessons')
             .select('id')
-            .eq('module_id', module.id);
+            .eq('module_id', module.id)
+            .eq('language', currentLanguage);
             
           if (lessonsError) throw lessonsError;
           
           const totalLessons = lessonsData ? lessonsData.length : 0;
           const lessonIds = lessonsData ? lessonsData.map(l => l.id) : [];
           
-          // Get user progress for these lessons
           let completedLessons = 0;
           let lastActivity = null;
           
-          // FIX: Only query if we have lesson IDs
           if (lessonIds.length > 0) {
             const { data: progressData, error: progressError } = await supabase
               .from('user_progress')
@@ -80,7 +139,6 @@ const ProgressPage = () => {
             
             completedLessons = progressData ? progressData.length : 0;
             
-            // Find most recent activity
             if (progressData && progressData.length > 0) {
               progressData.sort((a, b) => {
                 if (!a.completed_at) return 1;
@@ -93,12 +151,12 @@ const ProgressPage = () => {
           
           const percentage = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
 
-          // Get quiz scores for this module
           let quizScore = null;
           const { data: lessonsWithQuizzes, error: lessonsWithQuizzesError } = await supabase
             .from('lessons')
             .select('id, quizzes(id)')
             .eq('module_id', module.id)
+            .eq('language', currentLanguage)
             .not('quizzes', 'is', null);
 
           if (!lessonsWithQuizzesError && lessonsWithQuizzes && lessonsWithQuizzes.length > 0) {
@@ -109,31 +167,23 @@ const ProgressPage = () => {
             
             if (quizIds.length > 0) {
               try {
-                // Use a custom fetch approach instead of direct table access
-                const { data, error } = await supabase.functions.invoke('get-quiz-results', {
+                const { data: rpcData, error: rpcError } = await supabase.functions.invoke('get-quiz-results', {
                   body: JSON.stringify({
                     userId: user.id,
                     quizIds: quizIds
                   })
                 });
                 
-                if (error) {
-                  console.error("Error fetching quiz results:", error);
-                  // Fall back to mock data if there's an error
-                  quizScore = module.name === 'FMCG Fundamentals' ? 90 : 
-                              module.name === 'Sales Finance & Trade Marketing' ? 75 : 
-                              module.name === 'Digital Transformation in Sales' ? 80 : null;
-                } else if (data && Array.isArray(data) && data.length > 0) {
-                  // Use the average score for all quizzes in the module
-                  const totalScore = data.reduce((sum, result) => sum + (result.score || 0), 0);
-                  quizScore = Math.round(totalScore / data.length);
+                if (rpcError) {
+                  console.error("Error fetching quiz results via RPC:", rpcError);
+                  toast({ variant: 'destructive', title: 'Error', description: `Failed to load quiz scores: ${rpcError.message}` });
+                } else if (rpcData && Array.isArray(rpcData) && rpcData.length > 0) {
+                  const totalScore = rpcData.reduce((sum, result) => sum + (result.score || 0), 0);
+                  quizScore = Math.round(totalScore / rpcData.length);
                 }
               } catch (error) {
                 console.error("Error processing quiz results:", error);
-                // Fallback mock data
-                quizScore = module.name === 'FMCG Fundamentals' ? 90 : 
-                           module.name === 'Sales Finance & Trade Marketing' ? 75 : 
-                           module.name === 'Digital Transformation in Sales' ? 80 : null;
+                 toast({ variant: 'destructive', title: 'Error', description: 'Failed to process quiz results.' });
               }
             }
           }
@@ -152,7 +202,6 @@ const ProgressPage = () => {
         const moduleProgressResults = await Promise.all(moduleProgressPromises);
         setModulesProgress(moduleProgressResults);
         
-        // Calculate overall progress
         const totalLessonsAll = moduleProgressResults.reduce((sum, module) => sum + module.total_lessons, 0);
         const completedLessonsAll = moduleProgressResults.reduce((sum, module) => sum + module.completed_lessons, 0);
         const overallPercentage = totalLessonsAll > 0 ? Math.round((completedLessonsAll / totalLessonsAll) * 100) : 0;
@@ -162,16 +211,18 @@ const ProgressPage = () => {
         console.error('Error fetching progress:', error);
         toast({
           variant: "destructive",
-          title: "Error loading progress data",
-          description: "Please try refreshing the page"
+          title: t.errorLoadingProgress, // Translated
+          description: t.pleaseRefresh // Translated
         });
+        setModulesProgress([]);
+        setOverallProgress(0);
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchProgress();
-  }, [user]);
+  }, [user, currentLanguage]); // Removed 't' from dependencies
 
   const completionChartData = modulesProgress.map(module => ({
     name: module.name.replace(/\s+/g, '\n'),
@@ -196,7 +247,7 @@ const ProgressPage = () => {
       icon = BookOpen;
       iconColor = 'text-blue-500';
       progressColor = 'bg-blue-500';
-    } else if (module.name.includes('Finance')) {
+    } else if (module.name.includes('Finance') || module.name.includes('Sales')) {
       icon = BarChart3;
       iconColor = 'text-green-500';
       progressColor = 'bg-green-500';
@@ -213,7 +264,7 @@ const ProgressPage = () => {
       icon,
       iconColor,
       progressColor,
-      lessonsCompleted: `${module.completed_lessons} of ${module.total_lessons} lessons completed`
+      lessonsCompleted: `${module.completed_lessons} ${t.lessonsCompleted} ${module.total_lessons} `
     };
   });
 
@@ -225,8 +276,8 @@ const ProgressPage = () => {
         <main className="flex-1 overflow-y-auto p-6">
           <div className="yd-container animate-fade-in">
             <div className="mb-6">
-              <h2 className="text-3xl font-bold text-yd-orange">Your Learning Progress</h2>
-              <p className="text-muted-foreground">Track your performance across all modules and lessons</p>
+              <h2 className="text-3xl font-bold text-yd-orange">{t.yourLearningProgress}</h2>
+              <p className="text-muted-foreground">{t.trackPerformance}</p>
             </div>
             
             {isLoading ? (
@@ -236,7 +287,23 @@ const ProgressPage = () => {
             ) : (
               <>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                  {moduleCards.map((card, index) => (
+                  <YDCard className="overflow-hidden col-span-1 md:col-span-2 lg:col-span-2">
+                    <div className="p-4">
+                      <h3 className="font-medium text-base mb-2">{t.overallCourseProgress}</h3>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-3xl font-bold">{overallProgress}%</div>
+                        <div className="p-2 rounded-full text-primary bg-primary/10">
+                          <BookOpen className="h-6 w-6" />
+                        </div>
+                      </div>
+                      <Progress value={overallProgress} className="h-3" />
+                      <div className="text-sm text-muted-foreground mt-2">
+                        {modulesProgress.filter(m => m.percentage === 100).length} {t.modulesCompletedIn} {modulesProgress.length} {currentLanguage}
+                      </div>
+                    </div>
+                  </YDCard>
+
+                  {modulesProgress.length > 0 ? moduleCards.map((card, index) => (
                     <YDCard key={index} className="overflow-hidden">
                       <div className="p-4">
                         <h3 className="font-medium text-base mb-2">{card.title}</h3>
@@ -247,64 +314,52 @@ const ProgressPage = () => {
                           </div>
                         </div>
                         <Progress value={card.percentage} className="h-2 mb-2" />
-                        <div className="text-xs text-muted-foreground">{card.lessonsCompleted}</div>
+                        <div className="text-xs text-muted-foreground">
+                          {card.lessonsCompleted}
+                        </div>
                         {card.quizScore !== null && (
-                          <div className="text-xs text-muted-foreground mt-1">Quiz score: {card.quizScore}%</div>
+                          <div className="text-xs text-muted-foreground mt-1">{t.quizScore}: {card.quizScore}%</div>
                         )}
                       </div>
                     </YDCard>
-                  ))}
+                  )) : (
+                     <div className="col-span-full">
+                       <YDCard>
+                         <div className="p-6 text-center text-muted-foreground">
+                           {t.noModulesAvailable}
+                         </div>
+                       </YDCard>
+                     </div>
+                   )}
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
-                  <YDCard>
-                    <div className="p-4">
-                      <div className="flex items-center mb-4">
-                        <BarChart3 className="h-5 w-5 mr-2 text-blue-500" />
-                        <h3 className="font-medium">Module Completion Progress</h3>
+                {modulesProgress.length > 0 && (
+                  <div className="grid grid-cols-1 md:grid-cols-1 gap-4 mb-8">
+                    <YDCard>
+                      <div className="p-4">
+                        <div className="flex items-center mb-4">
+                          <PieChart className="h-5 w-5 mr-2 text-green-500" />
+                          <h3 className="font-medium">{t.quizPerformanceByModule}</h3>
+                        </div>
+                        <div className="h-72">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart
+                              data={quizChartData}
+                              layout="vertical"
+                              margin={{ top: 20, right: 30, left: 50, bottom: 20 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
+                              <XAxis type="number" domain={[0, 100]} />
+                              <YAxis type="category" dataKey="name" />
+                              <Tooltip />
+                              <Bar dataKey="value" fill="#10B981" barSize={30} radius={[0, 4, 4, 0]} />
+                            </BarChart>
+                          </ResponsiveContainer>
+                        </div>
                       </div>
-                      <div className="h-72">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart
-                            data={completionChartData}
-                            layout="vertical"
-                            margin={{ top: 20, right: 30, left: 50, bottom: 20 }}
-                          >
-                            <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
-                            <XAxis type="number" domain={[0, 100]} />
-                            <YAxis type="category" dataKey="name" />
-                            <Tooltip />
-                            <Bar dataKey="value" fill="#5553FF" barSize={30} radius={[0, 4, 4, 0]} />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </div>
-                  </YDCard>
-
-                  <YDCard>
-                    <div className="p-4">
-                      <div className="flex items-center mb-4">
-                        <PieChart className="h-5 w-5 mr-2 text-green-500" />
-                        <h3 className="font-medium">Quiz Performance by Module</h3>
-                      </div>
-                      <div className="h-72">
-                        <ResponsiveContainer width="100%" height="100%">
-                          <BarChart
-                            data={quizChartData}
-                            layout="vertical"
-                            margin={{ top: 20, right: 30, left: 50, bottom: 20 }}
-                          >
-                            <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
-                            <XAxis type="number" domain={[0, 100]} />
-                            <YAxis type="category" dataKey="name" />
-                            <Tooltip />
-                            <Bar dataKey="value" fill="#10B981" barSize={30} radius={[0, 4, 4, 0]} />
-                          </BarChart>
-                        </ResponsiveContainer>
-                      </div>
-                    </div>
-                  </YDCard>
-                </div>
+                    </YDCard>
+                  </div>
+                )}
               </>
             )}
           </div>
