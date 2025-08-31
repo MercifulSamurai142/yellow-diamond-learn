@@ -15,9 +15,10 @@ import Achievements from "./pages/Achievements";
 import Progress from "./pages/Progress";
 import Admin from "./pages/Admin";
 import NotFound from "./pages/NotFound";
+import ResetPasswordPage from "./pages/ResetPasswordPage"; // Import the new component
 import { AuthProvider } from "./contexts/AuthContext";
 import {ProgressProvider} from "./contexts/ProgressContext"
-import { LanguageProvider } from "./contexts/LanguageContext"; // Import LanguageProvider
+import { LanguageProvider } from "./contexts/LanguageContext";
 import ProtectedRoute from "./components/ProtectedRoute";
 
 // Create a single, stable QueryClient instance outside the component
@@ -39,13 +40,14 @@ const App = () => (
       <Sonner />
       <BrowserRouter>
         <AuthProvider>
-          <LanguageProvider> {/* LanguageProvider must wrap ProgressProvider */}
-            <ProgressProvider> {/* ProgressProvider is now inside LanguageProvider */}
+          <LanguageProvider>
+            <ProgressProvider>
               <Routes>
                 {/* Public routes */}
                 <Route path="/" element={<AuthPage />} />
                 <Route path="/login" element={<AuthPage />} />
-                
+                <Route path="/reset-password" element={<ResetPasswordPage />} /> {/* New route for password reset */}
+
                 {/* Protected routes */}
                 <Route path="/dashboard" element={
                   <ProtectedRoute>
@@ -57,7 +59,7 @@ const App = () => (
                     <Profile />
                   </ProtectedRoute>
                 } />
-                
+
                 {/* Module routes */}
                 <Route path="/modules" element={
                   <ProtectedRoute>
@@ -79,7 +81,7 @@ const App = () => (
                     <Quiz />
                   </ProtectedRoute>
                 } />
-                
+
                 {/* Other routes */}
                 <Route path="/achievements" element={
                   <ProtectedRoute>
@@ -96,12 +98,12 @@ const App = () => (
                     <Admin />
                   </ProtectedRoute>
                 } />
-                
+
                 {/* Not found route */}
                 <Route path="*" element={<NotFound />} />
               </Routes>
-            </ProgressProvider> {/* Close ProgressProvider */}
-          </LanguageProvider> {/* Close LanguageProvider */}
+            </ProgressProvider>
+          </LanguageProvider>
         </AuthProvider>
       </BrowserRouter>
     </TooltipProvider>

@@ -357,6 +357,7 @@ export type Database = {
           role: string
           updated_at: string | null
           region: string | null
+          psl_id: string | null
         }
         Insert: {
           created_at?: string | null
@@ -367,6 +368,7 @@ export type Database = {
           role?: string
           updated_at?: string | null
           region?: string | null
+          psl_id?: string | null
         }
         Update: {
           created_at?: string | null
@@ -377,6 +379,25 @@ export type Database = {
           role?: string
           updated_at?: string | null
           region?: string | null
+          psl_id?: string | null
+        }
+        Relationships: []
+      }
+      user_import_staging: {
+        Row: {
+          email: string
+          name: string | null          
+          psl_id: string
+        }
+        Insert: {
+          email?: string | null
+          name?: string | null          
+          psl_id: string
+        }
+        Update: {
+          email?: string | null
+          name?: string | null          
+          psl_id: string
         }
         Relationships: []
       }
