@@ -22,6 +22,7 @@ const translations = {
     emailAddress: "Email Address",
     role: "Role",
     region: "Region",
+    designation: "Designation", // New translation
     email: "Email",
     joined: "Joined",
     learningProgress: "Learning Progress",
@@ -52,6 +53,7 @@ const translations = {
     emailAddress: "ईमेल पता",
     role: "भूमिका",
     region: "क्षेत्र",
+    designation: "पदनाम", // New translation
     email: "ईमेल",
     joined: "शामिल हुआ",
     learningProgress: "सीखने की प्रगति",
@@ -82,6 +84,7 @@ const translations = {
     emailAddress: "ಇಮೇಲ್ ವಿಳಾಸ",
     role: "ಪಾತ್ರ",
     region: "ಪ್ರದೇಶ",
+    designation: "ಹುದ್ದೆ", // New translation
     email: "ಇಮೇಲ್",
     joined: "ಸೇರಿದರು",
     learningProgress: "ಕಲಿಕೆಯ ಪ್ರಗತಿ",
@@ -120,6 +123,7 @@ const Profile = () => {
     role: "learner",
     region: "North India",
     psl_id: null,
+    designation: "", // Added designation
   });
 
   const [passwordData, setPasswordData] = useState({
@@ -143,6 +147,7 @@ const Profile = () => {
         role: profile.role || "learner",
         region: profile.region || "",
         psl_id: profile.psl_id || null,
+        designation: profile.designation || "", // Added designation
       }));
     } else if (user && !profile) {
        setFormData(prev => ({ ...prev, email: user.email || "" }));
@@ -272,6 +277,7 @@ const Profile = () => {
       const updateData: Partial<UserProfile> = {};
       if (formData.name !== profile.name) updateData.name = formData.name;
       if (formData.region !== profile.region) updateData.region = formData.region;
+      if (formData.designation !== profile.designation) updateData.designation = formData.designation; // Added designation
       if (formData.psl_id && formData.psl_id !== profile.psl_id) updateData.psl_id = formData.psl_id;
 
       if (Object.keys(updateData).length === 0) {
@@ -441,7 +447,7 @@ const Profile = () => {
                     </button>
                   </div>
                   <h3 className="text-xl font-semibold">{formData.name || t.user}</h3>
-                  <p className="text-muted-foreground capitalize">{formData.role || t.learner}</p>
+                  <p className="text-muted-foreground capitalize">{formData.designation || formData.role || t.learner}</p>
                   <div className="border-t mt-4 pt-4">
                     <div className="flex justify-between text-sm py-2">
                       <span className="text-muted-foreground">{t.email}</span>
@@ -504,20 +510,34 @@ const Profile = () => {
                 <YDCard className="p-6">
                   <h3 className="font-semibold mb-6">{t.personalInformation}</h3>
                   <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
-                    <div className="space-y-2">
-                      <label htmlFor="psl_id" className="block text-sm font-medium text-foreground">
-                        {t.pslId}
-                      </label>
-                      <input
-                        id="psl_id"
-                        name="psl_id"
-                        type="text"
-                        value={formData.psl_id || ''}
-                        className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
-                        disabled
-                      />
-                    </div>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <label htmlFor="psl_id" className="block text-sm font-medium text-foreground">
+                          {t.pslId}
+                        </label>
+                        <input
+                          id="psl_id"
+                          name="psl_id"
+                          type="text"
+                          value={formData.psl_id || ''}
+                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                          disabled
+                        />
+                      </div>
+                       <div className="space-y-2">
+                        <label htmlFor="designation" className="block text-sm font-medium text-foreground">
+                          {t.designation}
+                        </label>
+                        <input
+                          id="designation"
+                          name="designation"
+                          type="text"
+                          value={formData.designation || ''}
+                          onChange={handleChange}
+                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          disabled
+                        />
+                      </div>
                       <div className="space-y-2">
                         <label htmlFor="name" className="block text-sm font-medium text-foreground">
                           {t.fullName}
@@ -528,7 +548,8 @@ const Profile = () => {
                           type="text"
                           value={formData.name || ''}
                           onChange={handleChange}
-                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-100"
+                          disabled
                         />
                       </div>
                       <div className="space-y-2">
@@ -544,6 +565,7 @@ const Profile = () => {
                           disabled
                         />
                       </div>
+                      
                       <div className="space-y-2">
                         <label htmlFor="role" className="block text-sm font-medium text-foreground">
                           {t.role}
