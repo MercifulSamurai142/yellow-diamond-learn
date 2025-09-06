@@ -1,4 +1,3 @@
-
 import { useState } from "react";
 import { YDCard } from "@/components/ui/YDCard";
 import YDButton from "@/components/ui/YDButton";
@@ -18,9 +17,10 @@ interface UserManagerProps {
 
 const UserManager = ({ users, onUsersUpdate, refreshData }: UserManagerProps) => {
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
-  const [editUserData, setEditUserData] = useState<{name: string, role: string}>({
+  const [editUserData, setEditUserData] = useState<{name: string, role: string, designation: string}>({
     name: '',
-    role: 'learner'
+    role: 'learner',
+    designation: ''
   });
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -31,7 +31,8 @@ const UserManager = ({ users, onUsersUpdate, refreshData }: UserManagerProps) =>
     setEditingUserId(userId);
     setEditUserData({
       name: user.name || '',
-      role: user.role
+      role: user.role,
+      designation: user.designation || ''
     });
   };
 
@@ -41,7 +42,8 @@ const UserManager = ({ users, onUsersUpdate, refreshData }: UserManagerProps) =>
         .from("users")
         .update({
           name: editUserData.name,
-          role: editUserData.role
+          role: editUserData.role,
+          designation: editUserData.designation
         })
         .eq("id", userId);
 
@@ -58,7 +60,8 @@ const UserManager = ({ users, onUsersUpdate, refreshData }: UserManagerProps) =>
           return {
             ...user,
             name: editUserData.name,
-            role: editUserData.role
+            role: editUserData.role,
+            designation: editUserData.designation
           };
         }
         return user;
@@ -83,7 +86,8 @@ const UserManager = ({ users, onUsersUpdate, refreshData }: UserManagerProps) =>
     return (
       user.name?.toLowerCase().includes(searchLower) ||
       user.email.toLowerCase().includes(searchLower) ||
-      user.role.toLowerCase().includes(searchLower)
+      user.role.toLowerCase().includes(searchLower) ||
+      user.designation?.toLowerCase().includes(searchLower)
     );
   });
 
@@ -128,12 +132,18 @@ const UserManager = ({ users, onUsersUpdate, refreshData }: UserManagerProps) =>
                   
                   <div>
                     {editingUserId === user.id ? (
-                      <div className="space-y-2">
+                      <div className="flex items-center gap-4">
                         <Input
                           value={editUserData.name}
                           onChange={(e) => setEditUserData({ ...editUserData, name: e.target.value })}
                           placeholder="User name"
-                          className="w-64"
+                          className="w-48"
+                        />
+                        <Input
+                          value={editUserData.designation}
+                          onChange={(e) => setEditUserData({ ...editUserData, designation: e.target.value })}
+                          placeholder="Designation"
+                          className="w-48"
                         />
                         <Select
                           value={editUserData.role}
@@ -152,11 +162,14 @@ const UserManager = ({ users, onUsersUpdate, refreshData }: UserManagerProps) =>
                       <>
                         <h4 className="font-medium">{user.name || 'Unnamed User'}</h4>
                         <p className="text-sm text-muted-foreground">{user.email}</p>
-                        <span className={`text-xs px-2 py-1 rounded ${
-                          user.role === 'admin' ? 'bg-primary/20 text-primary' : 'bg-gray-100'
-                        }`}>
-                          {user.role}
-                        </span>
+                        <div className="flex items-center gap-2 mt-1">
+                            <span className={`text-xs px-2 py-1 rounded-full ${
+                              user.role === 'admin' ? 'bg-primary/20 text-primary' : 'bg-gray-100'
+                            }`}>
+                              {user.role}
+                            </span>
+                           {user.designation && <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800">{user.designation}</span>}
+                        </div>
                       </>
                     )}
                   </div>
