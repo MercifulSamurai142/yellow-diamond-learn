@@ -10,7 +10,8 @@ import {
   Settings,
   Menu,
   X,
-  LogOut
+  LogOut,
+  Megaphone // Import new icon
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -38,7 +39,7 @@ const Sidebar = ({ className }: SidebarProps) => {
       companyName: "Yellow Diamond",
       dashboard: "Dashboard",
       modules: "Modules",
-      achievements: "Achievements",
+      announcements: "Announcements", // New translation
       progress: "Progress",
       profile: "Profile",
       settings: "Settings",
@@ -49,7 +50,7 @@ const Sidebar = ({ className }: SidebarProps) => {
       companyName: "यलो डायमंड",
       dashboard: "डैशबोर्ड",
       modules: "मॉड्यूल",
-      achievements: "उपलब्धियां",
+      announcements: "घोषणाएँ", // New translation
       progress: "प्रगति",
       profile: "प्रोफाइल",
       settings: "सेटिंग्स",
@@ -60,7 +61,7 @@ const Sidebar = ({ className }: SidebarProps) => {
       companyName: "ಯೆಲ್ಲೊ ಡೈಮಂಡ್",
       dashboard: "ಡ್ಯಾಶ್‌ಬೋರ್ಡ್",
       modules: "ಮಾಡ್ಯೂಲ್‌ಗಳು",
-      achievements: "ಸಾಧನೆಗಳು",
+      announcements: "ಪ್ರಕಟಣೆಗಳು", // New translation
       progress: "ಪ್ರಗತಿ",
       profile: "ಪ್ರೊಫೈಲ್",
       settings: "ಸೆಟ್ಟಿಂಗ್‌ಗಳು",
@@ -79,7 +80,7 @@ const Sidebar = ({ className }: SidebarProps) => {
   const navigationItems = [
     { name: t.dashboard, icon: <LayoutDashboard size={20} />, path: '/dashboard' },
     { name: t.modules, icon: <BookOpen size={20} />, path: '/modules' },
-    // { name: t.achievements, icon: <Award size={20} />, path: '/achievements' }, // Uncomment if achievements page is used
+    { name: t.announcements, icon: <Megaphone size={20} />, path: '/announcements' }, // New item added
     { name: t.progress, icon: <LineChart size={20} />, path: '/progress' },
     { name: t.profile, icon: <User size={20} />, path: '/profile' },
   ];
@@ -105,18 +106,16 @@ const Sidebar = ({ className }: SidebarProps) => {
             <span className="font-bold text-yd-navy">YD</span>
           </div>
         )}
-        {/* Close button for mobile sheet (the "new" one to keep) or desktop collapse button */}
-        {/* As per the very first response, this button changes functionality/icon based on mobile state */}
         {isMobile ? (
              <button
-                 onClick={() => setMobileOpen(false)} // This button closes the mobile sheet
+                 onClick={() => setMobileOpen(false)}
                  className="text-sidebar-foreground hover:bg-sidebar-accent rounded-md p-1"
              >
                  <X size={18} />
              </button>
         ) : (
             <button
-                onClick={() => setCollapsed(!collapsed)} // This button toggles desktop sidebar collapse
+                onClick={() => setCollapsed(!collapsed)}
                 className="text-sidebar-foreground hover:bg-sidebar-accent rounded-md p-1"
             >
                 {collapsed ? <Menu size={18} /> : <X size={18} />}
@@ -146,8 +145,6 @@ const Sidebar = ({ className }: SidebarProps) => {
             </li>
           ))}
 
-          {/* Admin items would be conditionally displayed based on user role */}
-          {/* Only render if profile is loaded and user is an admin */}
           {!isProfileLoading && profile?.role === 'admin' && (
             <li className="pt-4 mt-4 border-t border-sidebar-border">
               {!collapsed && <span className="px-2 text-xs uppercase tracking-wider text-sidebar-foreground/60">{t.admin}</span>}
@@ -161,7 +158,7 @@ const Sidebar = ({ className }: SidebarProps) => {
                       ? "bg-sidebar-primary text-sidebar-primary-foreground font-medium"
                       : "hover:bg-sidebar-accent"
                   )}
-                  onClick={() => isMobile && setMobileOpen(false)} // Close sidebar on mobile after navigation
+                  onClick={() => isMobile && setMobileOpen(false)}
                 >
                   <span className="flex-shrink-0">{item.icon}</span>
                   {!collapsed && <span>{item.name}</span>}
@@ -176,7 +173,7 @@ const Sidebar = ({ className }: SidebarProps) => {
         <button
           onClick={() => {
             signOut();
-            isMobile && setMobileOpen(false); // Close sidebar on mobile after sign out
+            isMobile && setMobileOpen(false);
           }}
           className={cn(
             "flex items-center gap-3 w-full px-2 py-2 rounded-md transition-colors hover:bg-sidebar-accent text-sidebar-foreground/90"
@@ -191,11 +188,9 @@ const Sidebar = ({ className }: SidebarProps) => {
 
   return (
     <>
-      {/* Mobile Sidebar (Sheet) */}
       {isMobile && (
         <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
           <SheetTrigger asChild>
-            {/* Hamburger menu button for mobile */}
             <button className="fixed top-4 left-4 z-50 p-2 rounded-md bg-white border shadow-sm md:hidden">
               <Menu size={20} />
             </button>
@@ -206,10 +201,9 @@ const Sidebar = ({ className }: SidebarProps) => {
         </Sheet>
       )}
 
-      {/* Desktop Sidebar */}
       <aside
         className={cn(
-          "bg-sidebar text-sidebar-foreground h-screen flex-col hidden md:flex", // Hide on mobile
+          "bg-sidebar text-sidebar-foreground h-screen flex-col hidden md:flex",
           collapsed ? "w-[70px]" : "w-[240px]",
           "transition-all duration-300 ease-in-out",
           className
