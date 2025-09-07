@@ -355,7 +355,7 @@ const LessonManager = ({ lessons, modules, onLessonsUpdate, refreshData }: Lesso
                     .sort((a, b) => a.order - b.order)
                     .map((module) => (
                       <SelectItem key={module.id} value={module.id}>
-                        {module.name}
+                        Module {module.order} - {module.name}
                       </SelectItem>
                     ))}
                 </SelectContent>
