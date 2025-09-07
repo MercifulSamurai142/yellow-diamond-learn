@@ -36,6 +36,39 @@ export type Database = {
         }
         Relationships: []
       }
+      announcements: {
+        Row: {
+          id: string
+          name: string
+          language: string
+          description: string | null
+          url: string | null
+          image_url : string | null
+          created_at: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          id?: string
+          name: string
+          language: string
+          description?: string | null
+          url?: string | null
+          image_url?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          id?: string
+          name?: string
+          language?: string
+          description?: string | null
+          url?: string | null
+          image_url?: string | null
+          created_at?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       answers: {
         Row: {
           answer_text: string
@@ -150,6 +183,52 @@ export type Database = {
           language?: string | null
         }
         Relationships: []
+      }
+      module_designation: { // New Table
+        Row: {
+          module_id: string
+          designation: string
+        }
+        Insert: {
+          module_id: string
+          designation: string
+        }
+        Update: {
+          module_id?: string
+          designation?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "module_designation_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "modules"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      module_region: { // New Table
+        Row: {
+          module_id: string
+          region: string
+        }
+        Insert: {
+          module_id: string
+          region: string
+        }
+        Update: {
+          module_id?: string
+          region?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "module_region_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "modules"
+            referencedColumns: ["id"]
+          }
+        ]
       }
       questions: {
         Row: {
@@ -357,6 +436,8 @@ export type Database = {
           role: string
           updated_at: string | null
           region: string | null
+          psl_id: string | null
+          designation: string | null
         }
         Insert: {
           created_at?: string | null
@@ -367,6 +448,8 @@ export type Database = {
           role?: string
           updated_at?: string | null
           region?: string | null
+          psl_id?: string | null
+          designation?: string | null
         }
         Update: {
           created_at?: string | null
@@ -377,6 +460,26 @@ export type Database = {
           role?: string
           updated_at?: string | null
           region?: string | null
+          psl_id?: string | null
+          designation?: string | null
+        }
+        Relationships: []
+      }
+      user_import_staging: {
+        Row: {
+          email: string
+          name: string | null          
+          psl_id: string
+        }
+        Insert: {
+          email?: string | null
+          name?: string | null          
+          psl_id: string
+        }
+        Update: {
+          email?: string | null
+          name?: string | null          
+          psl_id: string
         }
         Relationships: []
       }

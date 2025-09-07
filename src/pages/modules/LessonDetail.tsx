@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+// yellow-diamond-learn-main/src/pages/modules/LessonDetail.tsx
+import { useEffect, useState, useContext } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
 import Header from "@/components/layout/Header";
 import Sidebar from "@/components/layout/Sidebar";
@@ -11,8 +12,9 @@ import { toast } from "@/hooks/use-toast";
 import { Tables } from "@/integrations/supabase/types";
 import { checkAndAwardAchievements } from "@/services/achivementServices";
 import { CheckContext } from "@/services/achivementServices";
-import { useIsMobile } from "@/hooks/use-mobile"; // Import useIsMobile
-import { cn } from "@/lib/utils"; // Import cn utility to combine classes
+import { useIsMobile } from "@/hooks/use-mobile";
+import { cn } from "@/lib/utils";
+import { LanguageContext } from '@/contexts/LanguageContext'; // Import LanguageContext
 
 type Lesson = Tables<"lessons">
 
@@ -30,11 +32,72 @@ const LessonDetail = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const { user } = useAuth();
   const navigate = useNavigate();
-  const isMobile = useIsMobile(); // Use the hook to detect mobile
+  const isMobile = useIsMobile();
+  const { currentLanguage } = useContext(LanguageContext)!; // Get currentLanguage
+
+  // Start of markAsCompleted function (added back)
+  const markAsCompleted = async () => {
+    if (!user || !lessonId || !lesson) return; // Ensure lesson is loaded
+
+    // Prevent double-clicking or action while navigating
+    setIsLoading(true);
+
+    try {
+      const { error } = await supabase
+        .from('user_progress')
+        .upsert({
+          user_id: user.id,
+          lesson_id: lessonId,
+          status: 'completed',
+          completed_at: new Date().toISOString(),
+        }, {
+           onConflict: 'user_id, lesson_id'
+        })
+        .select('id')
+        .single();
+
+      if (error) throw error;
+
+      if (user && lessonId && moduleId) {
+        const checkContext: CheckContext = {
+            userId: user.id,
+            lessonId: lessonId,
+            moduleId: moduleId,
+        };
+         checkAndAwardAchievements(checkContext).catch(err => console.error("Achievement check failed:", err));
+    }
+
+      toast({
+        title: "Lesson completed!",
+        description: "Your progress has been saved.",
+      });
+
+       setTimeout(() => {
+           if (hasQuiz) {
+             navigate(`/modules/${moduleId}/lessons/${lessonId}/quiz`);
+           } else if (nextLesson) {
+             navigate(`/modules/${moduleId}/lessons/${nextLesson.id}`);
+           } else {
+             navigate(`/modules/${moduleId}`);
+             toast({ title: "Module completed!", description: "Congratulations!"});
+           }
+       }, 500);
+
+
+    } catch (error: any) {
+      console.error('Error updating progress:', error);
+      toast({
+        variant: "destructive",
+        title: "Error Saving Progress",
+        description: error?.message || "Failed to update progress.",
+      });
+      setIsLoading(false);
+    }
+  };
+  // End of markAsCompleted function
 
   useEffect(() => {
     const fetchLessonData = async () => {
-      // Reset state on new fetch
       setLesson(null);
       setModule(null);
       setNextLesson(null);
@@ -54,16 +117,19 @@ const LessonDetail = () => {
           .eq('id', lessonId)
           .single();
 
-        // Handle potential null result from .single()
         if (lessonError) {
             console.error("Lesson fetch error:", lessonError);
-            // Check if it's a "not found" error
-            if (lessonError.code === 'PGRST116') { // PGRST116: Row not found
+            if (lessonError.code === 'PGRST116') {
                  throw new Error(`Lesson with ID ${lessonId} not found.`);
             }
-            throw lessonError; // Rethrow other errors
+            throw lessonError;
         }
         if (!lessonData) throw new Error(`Lesson with ID ${lessonId} not found.`);
+
+        // Check if the fetched lesson's language matches the current selected language.
+        if (lessonData.language && lessonData.language !== currentLanguage) {
+             console.warn(`Lesson ${lessonId} is in ${lessonData.language}, but current language is ${currentLanguage}. Displaying anyway.`);
+        }
 
         setLesson(lessonData as Lesson);
 
@@ -72,7 +138,7 @@ const LessonDetail = () => {
           throw new Error(`Invalid order type for current lesson: ${typeof lessonData.order}`);
         }
 
-        // Fetch module details (only if lesson fetch was successful)
+        // Fetch module details
         const { data: moduleData, error: moduleError } = await supabase
           .from('modules')
           .select('id, name')
@@ -84,74 +150,60 @@ const LessonDetail = () => {
 
         setModule(moduleData as Module);
 
-        // Check if there's a quiz for this lesson
-        // Use count for efficiency if only existence is needed
+        // Check for quiz
         const { count: quizCount, error: quizError } = await supabase
           .from('quizzes')
-          .select('*', { count: 'exact', head: true }) // Count rows without fetching data
+          .select('*', { count: 'exact', head: true })
           .eq('lesson_id', lessonId);
 
         if (quizError) throw quizError;
 
         setHasQuiz(quizCount !== null && quizCount > 0);
 
-        // Fetch ALL lessons for the module, sorted by order  
-        // TODO - Fix this feature so as to not fetch all lessons everytime, change the column name of lesson table to something other than order
+        // Fetch ALL lessons for the module, sorted by order, AND FILTERED BY LANGUAGE
         const { data: allModuleLessons, error: allLessonsError } = await supabase
             .from('lessons')
-            .select('id, order') // Select only needed fields
+            .select('id, order')
             .eq('module_id', moduleId)
-            .order('order', { ascending: true }); // Only sort
+            .eq('language', currentLanguage) // Filter by language for next/prev logic
+            .order('order', { ascending: true });
 
-        // Handle errors fetching all lessons
         if (allLessonsError) {
-            console.error("Error fetching all module lessons for workaround:", allLessonsError);
-            // Don't necessarily throw here, maybe just log and proceed without next lesson?
-            // Depending on desired behavior. We'll throw for now.
-            throw new Error(`Failed to fetch module lessons: ${allLessonsError.message}`);
+            console.error("Error fetching all module lessons:", allLessonsError);
+            throw new Error(`Failed to fetch module lessons for navigation: ${allLessonsError.message}`);
         }
         if (!allModuleLessons) {
-             console.warn('No lessons found for this module when searching for next lesson.');
-             setNextLesson(null); // Ensure next lesson is null
-             // Continue processing other data like progress...
+             console.warn('No lessons found for this module in the current language when searching for next lesson.');
+             setNextLesson(null);
         } else {
-            // Find the index of the current lesson in the sorted array
             const currentLessonIndex = allModuleLessons.findIndex(l => l.id === lessonId);
-
-            // Determine the next lesson
             let nextLessonResult: { id: string; order: number } | null = null;
             if (currentLessonIndex !== -1 && currentLessonIndex < allModuleLessons.length - 1) {
-                // If current lesson found and it's not the last one in the array
                 nextLessonResult = allModuleLessons[currentLessonIndex + 1];
             }
-
-            // Set the state
-            setNextLesson(nextLessonResult); // Will be null if no next lesson found
+            setNextLesson(nextLessonResult);
         }
 
         // Get user progress
         if (user) {
           const { data: progressData, error: progressError } = await supabase
             .from('user_progress')
-            .select('*') // Select all fields if needed, or specify like 'id, status, completed_at'
+            .select('*')
             .eq('user_id', user.id)
             .eq('lesson_id', lessonId)
-            .maybeSingle(); // Use maybeSingle to handle 0 or 1 result without error
+            .maybeSingle();
 
           if (progressError) throw progressError;
 
-          setProgress(progressData as UserProgress | null); // Allow null if no progress found
+          setProgress(progressData as UserProgress | null);
         }
-      } catch (error: any) { // Catch error with 'any' type for broader compatibility
-        console.error('Error fetching lesson data:', error); // Log the specific error caught
+      } catch (error: any) {
+        console.error('Error fetching lesson data:', error);
         toast({
           variant: "destructive",
           title: "Error Loading Lesson",
-          // Provide a more specific message if possible from the error object
           description: error?.message || "Failed to load lesson content. Please try again.",
         });
-        // Optional: Navigate back or show a specific error component
-        // navigate(`/modules/${moduleId}`);
       } finally {
         setIsLoading(false);
       }
@@ -159,87 +211,9 @@ const LessonDetail = () => {
 
     fetchLessonData();
 
-    // Cleanup function if needed, though likely not for this effect
-    // return () => { /* cleanup logic */ };
-
-  }, [lessonId, moduleId, user, navigate]); // Added navigate to dependency array
-
-
-
-  const markAsCompleted = async () => {
-    if (!user || !lessonId || !lesson) return; // Ensure lesson is loaded
-
-    // Prevent double-clicking or action while navigating
-    setIsLoading(true);
-
-    try {
-      // Use upsert for simpler logic: insert if not exists, update if exists
-      const { error } = await supabase
-        .from('user_progress')
-        .upsert({
-          // If progress exists, `id` might be needed depending on RLS policy for update.
-          // If inserting, Supabase handles ID generation.
-          // We provide composite keys (user_id, lesson_id) for matching.
-          user_id: user.id,
-          lesson_id: lessonId,
-          status: 'completed',
-          completed_at: new Date().toISOString(),
-          // Include 'id' only if updating an existing record and needed by policy
-          // id: progress?.id
-        }, {
-           onConflict: 'user_id, lesson_id' // Specify columns that define a unique row
-        })
-        .select('id') // Select something to confirm success/return data if needed
-        .single(); // Expect one row affected/returned
-
-      if (error) throw error;
-
-      if (user && lessonId && moduleId) { // Ensure needed IDs are available
-        const checkContext: CheckContext = {
-            userId: user.id,
-            lessonId: lessonId,
-            moduleId: moduleId,
-        };
-        // Run checks in background, don't necessarily await unless needed for immediate UI update
-         checkAndAwardAchievements(checkContext).catch(err => console.error("Achievement check failed:", err));
-    }
-
-      toast({
-        title: "Lesson completed!",
-        description: "Your progress has been saved.",
-      });
-
-       // Add a small delay before navigation to allow toast to be seen
-       setTimeout(() => {
-           // Navigate to quiz or next lesson
-           if (hasQuiz) {
-             navigate(`/modules/${moduleId}/lessons/${lessonId}/quiz`);
-           } else if (nextLesson) {
-             navigate(`/modules/${moduleId}/lessons/${nextLesson.id}`);
-           } else {
-             // If no next lesson, navigate back to the module page
-             navigate(`/modules/${moduleId}`);
-             toast({ title: "Module completed!", description: "Congratulations!"});
-           }
-       }, 500); // 500ms delay
-
-
-    } catch (error: any) {
-      console.error('Error updating progress:', error);
-      toast({
-        variant: "destructive",
-        title: "Error Saving Progress",
-        description: error?.message || "Failed to update progress.",
-      });
-      setIsLoading(false); // Re-enable button if error occurs
-    }
-     // Don't set isLoading false here if navigation occurs in setTimeout
-  };
-
-  // --- Render logic ---
+  }, [lessonId, moduleId, user, navigate, currentLanguage]);
 
   if (isLoading) {
-    // Use the same full-page loading indicator structure
     return (
       <div className="flex h-screen bg-background">
         <Sidebar />
@@ -255,7 +229,7 @@ const LessonDetail = () => {
     );
   }
 
-  if (!lesson || !module) { // Handle case where lesson or module data failed to load after loading state
+  if (!lesson || !module) {
     return (
       <div className="flex h-screen bg-background">
         <Sidebar />
@@ -276,15 +250,14 @@ const LessonDetail = () => {
     );
   }
 
-  // Main content render
   return (
     <div className="flex h-screen bg-background">
       <Sidebar />
       <div className="flex flex-col flex-1 overflow-hidden">
         <Header />
         <main className={cn("flex-1 overflow-y-auto ", isMobile ? "px-0 py-6" : "p-6")}>
-          <div className={cn("yd-container animate-fade-in", isMobile ? "p-0": "")}> {/* Apply dynamic padding based on isMobile */}
-            <div className="flex flex-wrap justify-between items-center gap-4 mb-8"> {/* Use flex-wrap and gap */}
+          <div className={cn("yd-container animate-fade-in", isMobile ? "p-0": "")}>
+            <div className="flex flex-wrap justify-between items-center gap-4 mb-8">
               <Link to={`/modules/${moduleId}`} className="text-primary hover:underline flex items-center text-sm">
                 <ArrowLeft size={16} className="mr-1" />
                 Back to: {module.name}
@@ -295,14 +268,12 @@ const LessonDetail = () => {
               </div>
             </div>
 
-            {/* Apply dynamic padding based on isMobile */}
-            <h2 className={cn("yd-section-title mb-6", isMobile ? "px-4" : "px-0")}>{lesson.title}</h2> {/* <-- Dynamically apply px-4 on mobile */}
+            <h2 className={cn("yd-section-title mb-6", isMobile ? "px-4" : "px-0")}>{lesson.title}</h2>
 
             {lesson.video_url ? (
-                // Use a responsive container for the video. On mobile, remove horizontal padding.
-                <div className={cn("aspect-video", isMobile ? "px-4 bg-white":"bg-black")}> {/* Removed px-0 md:px-0 as it's redundant/unnecessary here */}
+                <div className={cn("aspect-video", isMobile ? "px-4 bg-white":"bg-black")}>
                   <video
-                    key={lesson.video_url} // Force re-render if URL changes
+                    key={lesson.video_url}
                     controls
                     className="w-full h-full"
                     src={lesson.video_url}
@@ -311,20 +282,14 @@ const LessonDetail = () => {
                   </video>
                 </div>
               ) : null}
-            <YDCard className="mb-8 overflow-hidden rounded-none md:rounded-lg"> {/* <-- ADDED rounded-none md:rounded-lg */}
-              
-              {/* Line 282: The div inside YDCard. Change its padding */}
-              {/* Dynamically apply p-0 on mobile, p-6 on desktop using isMobile */}
-              <div className={cn(isMobile ? "p-0" : "p-6")}> {/* <-- Dynamically apply p-0 on mobile */}
+            <YDCard className="mb-8 p-0 overflow-hidden rounded-none md:rounded-lg">
+              <div className={cn(isMobile ? "p-0" : "p-6")}>
                 {lesson.content ? (
-                  // Using prose for basic styling, ensure Tailwind typography plugin is installed
-                  // Ensure prose elements expand fully within the card content
                   <div className="prose dark:prose-invert max-w-full">
                     <div dangerouslySetInnerHTML={{ __html: lesson.content }} />
                   </div>
                 ) : (
-                  // Apply dynamic padding for the "no content" message
-                  <p className={cn("text-muted-foreground", isMobile ? "px-4" : "px-0")}>This lesson has no content yet.</p> 
+                  <p className={cn("text-muted-foreground", isMobile ? "px-4" : "px-0")}>This lesson has no content yet.</p>
                 )}
               </div>
             </YDCard>
@@ -336,16 +301,15 @@ const LessonDetail = () => {
                   <span>Completed!</span>
                 </div>
               ) : (
-                // Placeholder to keep button alignment
                 <div></div>
               )}
 
               <YDButton
-                onClick={markAsCompleted}
-                disabled={isLoading} // Disable button during the completion process/navigation
+                onClick={markAsCompleted} // The fixed call
+                disabled={isLoading}
               >
                 {isLoading && progress?.status !== 'completed' ? (
-                  <Loader2 size={16} className="mr-2 animate-spin" /> // Show loader only when marking complete
+                  <Loader2 size={16} className="mr-2 animate-spin" />
                 ) : null}
                 {progress?.status === 'completed'
                     ? (hasQuiz ? 'Go to Quiz' : nextLesson ? 'Next Lesson' : 'Finish Module')

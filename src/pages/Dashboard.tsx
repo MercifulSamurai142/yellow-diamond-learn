@@ -1,4 +1,5 @@
-import { useEffect, useState } from "react";
+// yellow-diamond-learn-main/src/pages/Dashboard.tsx
+import { useEffect, useState, useContext } from "react"; // Import useContext
 import { BookOpen, CheckCircle, Award, ChevronRight, Loader2} from "lucide-react";
 import {
   YDCard,
@@ -19,8 +20,9 @@ import { toast } from "@/hooks/use-toast";
 import { Tables } from "@/integrations/supabase/types";
 import HeroBanner from "@/components/dashboard/HeroBanner";
 import { useProgress } from "@/contexts/ProgressContext";
-import { useIsMobile } from "@/hooks/use-mobile"; // Import useIsMobile
+import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
+import { LanguageContext } from '@/contexts/LanguageContext'; // Import LanguageContext
 
 type ModuleWithProgress = Tables<"modules"> & {
   lessons: number;
@@ -37,39 +39,103 @@ const Dashboard = () => {
   const { profile } = useProfile();
   const { progressStats, isLoading: isProgressLoading } = useProgress();
   const [modules, setModules] = useState<ModuleWithProgress[]>([]);
-  const [achievements, setAchievements] = useState<Achievement[]>([]);
+  const [achievements, setAchievements] = useState<Achievement[]>([]); // Achievements list, kept as is.
   const [isListLoading, setIsListLoading] = useState(true);
-  const isMobile = useIsMobile(); // Use the mobile hook
+  const isMobile = useIsMobile();
+  const { currentLanguage } = useContext(LanguageContext)!; // Get currentLanguage from context
+
+  // Translation object structure
+  const translations = {
+    english: {
+      welcomeTitle: "Welcome to Yellow Diamond Academy",
+      welcomeSubtitle: "Track your progress and continue your learning journey",
+      courseProgress: "Course Progress",
+      modulesCompleted: "Modules Completed",
+      yourModules: "Your Modules",
+      viewAllModules: "View all modules",
+      lessons: "lessons",
+      complete: "Complete",
+      startModule: "Start",
+      continueModule: "Continue",
+      reviewModule: "Review",
+      module: "Module",
+      noModulesAvailable: "No modules available for the selected language.",
+      errorTitle: "Error",
+      errorDescription: "Failed to load dashboard lists"
+    },
+    hindi: {
+      welcomeTitle: "यलो डायमंड एकेडमी में आपका स्वागत है",
+      welcomeSubtitle: "अपनी प्रगति को ट्रैक करें और अपनी सीखने की यात्रा जारी रखें",
+      courseProgress: "कोर्स प्रगति",
+      modulesCompleted: "मॉड्यूल पूर्ण",
+      yourModules: "आपके मॉड्यूल",
+      viewAllModules: "सभी मॉड्यूल देखें",
+      lessons: "पाठ",
+      complete: "पूर्ण",
+      startModule: "शुरू करें",
+      continueModule: "जारी रखें",
+      reviewModule: "समीक्षा",
+      module: "मॉड्यूल",
+      noModulesAvailable: "चयनित भाषा के लिए कोई मॉड्यूल उपलब्ध नहीं है।",
+      errorTitle: "त्रुटि",
+      errorDescription: "डैशबोर्ड सूची लोड करने में असफल"
+    },
+    kannada: {
+      welcomeTitle: "ಯೆಲ್ಲೊ ಡೈಮಂಡ್ ಅಕಾಡೆಮಿಗೆ ಸ್ವಾಗತ",
+      welcomeSubtitle: "ನಿಮ್ಮ ಪ್ರಗತಿಯನ್ನು ಟ್ರ್ಯಾಕ್ ಮಾಡಿ ಮತ್ತು ನಿಮ್ಮ ಕಲಿಕೆಯ ಪ್ರಯಾಣವನ್ನು ಮುಂದುವರಿಸಿ",
+      courseProgress: "ಕೋರ್ಸ್ ಪ್ರಗತಿ",
+      modulesCompleted: "ಮಾಡ್ಯೂಲ್‌ಗಳು ಪೂರ್ಣಗೊಂಡಿವೆ",
+      yourModules: "ನಿಮ್ಮ ಮಾಡ್ಯೂಲ್‌ಗಳು",
+      viewAllModules: "ಎಲ್ಲಾ ಮಾಡ್ಯೂಲ್‌ಗಳನ್ನು ವೀಕ್ಷಿಸಿ",
+      lessons: "ಪಾಠಗಳು",
+      complete: "ಪೂರ್ಣ",
+      startModule: "ಪ್ರಾರಂಭಿಸಿ",
+      continueModule: "ಮುಂದುವರಿಸಿ",
+      reviewModule: "ಪರಿಶೀಲನೆ",
+      module: "ಮಾಡ್ಯೂಲ್",
+      noModulesAvailable: "ಆಯ್ಕೆಮಾಡಿದ ಭಾಷೆಗಾಗಿ ಯಾವುದೇ ಮಾಡ್ಯೂಲ್‌ಗಳು ಲಭ್ಯವಿಲ್ಲ.",
+      errorTitle: "ದೋಷ",
+      errorDescription: "ಡ್ಯಾಶ್‌ಬೋರ್ಡ್ ಪಟ್ಟಿಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ವಿಫಲವಾಗಿದೆ"
+    }
+  };
+
+  // Get current language translations
+  const t = translations[currentLanguage] || translations.english;
 
   useEffect(() => {
     if (!user) {
-      setIsListLoading(false); // Stop loading if no user
+      setIsListLoading(false);
       return;
     }
 
     const fetchListData = async () => {
-      // Fetch data needed specifically for rendering the lists in the dashboard
       try {
         setIsListLoading(true);
 
-        // Fetch modules
+        // Fetch modules filtered by currentLanguage
         const { data: modulesData, error: modulesError } = await supabase
           .from('modules')
-          .select('*') // Select all fields needed for display
+          .select('*')
+          .eq('language', currentLanguage) // Apply language filter
           .order('order');
 
         if (modulesError) throw modulesError;
-        if (!modulesData) throw new Error("No modules found");
+        if (!modulesData) {
+          setModules([]);
+          setIsListLoading(false);
+          return;
+        }
 
-        // Fetch all lessons to calculate progress per module
+        // Fetch all lessons (also filtered by language to match modules)
         const { data: allLessonsData, error: lessonsError } = await supabase
            .from('lessons')
-           .select('id, module_id'); // Select needed fields
+           .select('id, module_id')
+           .eq('language', currentLanguage); // Filter lessons by language
 
         if (lessonsError) throw lessonsError;
-        if (!allLessonsData) throw new Error("No lessons found");
+        // Don't throw fatal if no lessons, calculations will handle it.
 
-        // Fetch completed progress items for the user
+        // Fetch completed progress items for the user (not language specific)
         const { data: progressData, error: progressError } = await supabase
           .from('user_progress')
           .select('lesson_id')
@@ -83,7 +149,7 @@ const Dashboard = () => {
 
         // Map modules to include progress and status for display
         const modulesWithProgress = modulesData.map((module) => {
-            const lessonsInModule = allLessonsData.filter(l => l.module_id === module.id);
+            const lessonsInModule = (allLessonsData || []).filter(l => l.module_id === module.id);
             const lessonCount = lessonsInModule.length;
             const completedLessonsInModule = lessonsInModule.filter(l => completedLessonIds.has(l.id)).length;
 
@@ -108,66 +174,55 @@ const Dashboard = () => {
 
         setModules(modulesWithProgress);
 
-        // Fetch achievements
+        // Achievements fetching is left as is, as it's typically language-agnostic
+        // (commented out in original, so keeping it commented)
         // const { data: achievementsData, error: achievementsError } = await supabase
         //   .from('achievements')
-        //   .select('*'); // Select fields needed for display
-
+        //   .select('*');
         // if (achievementsError) throw achievementsError;
-        // if (!achievementsData) throw new Error("No achievements found");
-
-        // // Fetch unlocked achievements
         // const { data: unlockedAchievementsData, error: unlockedError } = await supabase
         //   .from('user_achievements')
         //   .select('achievement_id')
         //   .eq('user_id', user.id);
-
         // if (unlockedError) throw unlockedError;
-
         // const unlockedIds = new Set(unlockedAchievementsData?.map(ua => ua.achievement_id) || []);
-
         // const achievementsWithStatus = achievementsData.map(achievement => ({
         //   ...achievement,
         //   unlocked: unlockedIds.has(achievement.id)
         // }));
-
         // setAchievements(achievementsWithStatus);
 
       } catch (error) {
         console.error('Error fetching dashboard list data:', error);
         toast({
           variant: "destructive",
-          title: "Error",
-          description: "Failed to load dashboard lists"
+          title: t.errorTitle,
+          description: t.errorDescription
         });
+        setModules([]);
       } finally {
         setIsListLoading(false);
       }
     };
 
     fetchListData();
-  }, [user]);
+  }, [user, currentLanguage, t.errorTitle, t.errorDescription]); // Re-run effect when currentLanguage changes
 
-  // Find the most appropriate module to continue from local "modules" state
   const findContinueModule = () => {
-    // First priority: in-progress modules
     const inProgressModules = modules.filter(m => m.status === "in-progress");
     if (inProgressModules.length > 0) {
       return inProgressModules.sort((a, b) => b.progress - a.progress)[0];
     }
 
-    // Second priority: not-started modules
     const notStartedModules = modules.filter(m => m.status === "not-started");
     if (notStartedModules.length > 0) {
       return notStartedModules.sort((a, b) => a.order - b.order)[0];
     }
 
-    // Default to first module if all completed
     return modules[0];
   };
 
   const continueModule = modules.length > 0 ? findContinueModule() : null;
-  // Combine loading states for the main spinner display
   const showOverallLoading = isProgressLoading || isListLoading;
 
   return (
@@ -177,17 +232,18 @@ const Dashboard = () => {
       <div className="flex flex-col flex-1 overflow-hidden">
         <Header />
 
-        <main className="flex-1 overflow-y-auto"> {/* Removed p-6 from main */}
-          {/* Hero Banner - Conditionally apply padding/margin */}
-          <div className={isMobile ? "px-0 mb-8" : "yd-container animate-fade-in mb-8 p-6"}> {/* Added conditional px-0 */}
+        <main className="flex-1 overflow-y-auto">
+          <div className={isMobile ? "px-0 mb-8" : "yd-container animate-fade-in mb-8 p-6"}>
             <HeroBanner />
           </div>
 
-          <div className={cn("animate-fade-in", isMobile ? "px-4" : "yd-container")}> {/* Apply yd-container or mobile padding */}
+          <div className={cn("animate-fade-in", isMobile ? "px-4" : "yd-container")}>
             <div className="flex justify-between items-center mb-8">
-              <h2 className="text-2xl font-semibold text-orange-600">Welcome to Yellow Diamond Academy</h2>
-              <p className="text-slate-500">Track your progress and continue your learning journey</p>
+              <h2 className="text-2xl font-semibold text-orange-600">{t.welcomeTitle}</h2>
+              <p className="text-slate-500">{t.welcomeSubtitle}</p>
             </div>
+
+            
 
             {showOverallLoading ? (
               <div className="flex items-center justify-center h-64">
@@ -195,7 +251,8 @@ const Dashboard = () => {
               </div>
             ) : (
               <>
-                {/* Progress summary - Uses progressStats from Context */}
+                {/* Progress summary - Uses progressStats from ProgressContext */}
+                {/* These stats are global but will be based on the language-filtered data in ProgressContext */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8">
                   <YDCard>
                     <div className="flex items-center p-4">
@@ -203,7 +260,7 @@ const Dashboard = () => {
                         <BookOpen size={24} className="text-primary" />
                       </div>
                       <div>
-                        <p className="text-foreground text-sm">Course Progress</p>
+                        <p className="text-foreground text-sm">{t.courseProgress}</p>
                         <p className="text-2xl font-semibold">{progressStats.moduleProgress}%</p>
                       </div>
                     </div>
@@ -215,31 +272,19 @@ const Dashboard = () => {
                         <CheckCircle size={24} className="text-green-500" />
                       </div>
                       <div>
-                        <p className="text-foreground text-sm">Modules Completed</p>
+                        <p className="text-foreground text-sm">{t.modulesCompleted}</p>
                         <p className="text-2xl font-semibold">{progressStats.completedModules}/{progressStats.totalModules}</p>
                       </div>
                     </div>
                   </YDCard>
-
-                  {/* <YDCard>
-                    <div className="flex items-center p-4">
-                      <div className="p-3 bg-amber-500/10 rounded-lg mr-4">
-                        <Award size={24} className="text-amber-500" />
-                      </div>
-                      <div>
-                        <p className="text-muted-foreground text-sm">Achievements</p>
-                        <p className="text-2xl font-semibold">{progressStats.unlockedAchievements}/{progressStats.totalAchievements}</p>
-                      </div>
-                    </div>
-                  </YDCard> */}
                 </div>
 
-                {/* Modules - Uses local 'modules' state */}
+                {/* Modules - Uses local 'modules' state (already filtered by language) */}
                 <div className="mb-8">
                   <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-xl font-medium text-foreground">Your Modules</h3>
+                    <h3 className="text-xl font-medium text-foreground">{t.yourModules}</h3>
                     <Link to="/modules" className="text-sm text-primary flex items-center hover:underline">
-                      View all modules <ChevronRight size={16} />
+                      {t.viewAllModules} <ChevronRight size={16} />
                     </Link>
                   </div>
 
@@ -250,15 +295,15 @@ const Dashboard = () => {
                   ) : modules.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                       {modules.map((module) => (
-                        <YDCard key={module.id} className="hover:border-primary transition-colors">
+                        <YDCard key={module.id} className="hover:border-primary transition-colors flex flex-col h-full">
                           <YDCardHeader>
                             <YDCardTitle>{module.name}</YDCardTitle>
                             <YDCardDescription>{module.description}</YDCardDescription>
                           </YDCardHeader>
-                          <YDCardContent>
+                          <YDCardContent className="mt-auto">
                             <div className="flex items-center justify-between mb-1">
-                              <span className="text-sm text-muted-foreground">{module.progress}% Complete</span>
-                              <span className="text-sm text-muted-foreground">{module.lessons} lessons</span>
+                              <span className="text-sm text-muted-foreground">{module.progress}% {t.complete}</span>
+                              <span className="text-sm text-muted-foreground">{module.lessons} {t.lessons}</span>
                             </div>
                             <div className="w-full bg-muted rounded-full h-2 mt-1">
                               <div
@@ -267,10 +312,10 @@ const Dashboard = () => {
                               ></div>
                             </div>
                           </YDCardContent>
-                          <YDCardFooter>
+                          <YDCardFooter className="mt-auto">
                             <Link to={`/modules/${module.id}`} className="w-full">
                               <YDButton variant="default" className="w-full">
-                                {module.status === 'completed' ? "Review" : module.status === 'in-progress' ? "Continue" : "Start"} Module
+                                {module.status === 'completed' ? t.reviewModule : module.status === 'in-progress' ? t.continueModule : t.startModule} {t.module}
                               </YDButton>
                             </Link>
                           </YDCardFooter>
@@ -278,56 +323,9 @@ const Dashboard = () => {
                       ))}
                     </div>
                   ) : (
-                     <p className="text-muted-foreground">No modules assigned yet.</p>
+                     <p className="text-muted-foreground">{t.noModulesAvailable}</p>
                   )}
                 </div>
-
-                {/* Recent Achievements - Uses local 'achievements' state */}
-                
-                {/* 
-                <div>
-                  <div className="flex justify-between items-center mb-4">
-                    <h3 className="text-xl font-medium text-foreground">Recent Achievements</h3>
-                    <Link to="/achievements" className="text-sm text-primary flex items-center hover:underline">
-                      View all achievements <ChevronRight size={16} />
-                    </Link>
-                  </div>
-                  {isListLoading ? (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        {[1, 2, 3].map(i => <div key={i} className="h-24 bg-muted rounded-lg animate-pulse"></div>)}
-                    </div>
-                  ) : achievements.length > 0 ? (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                      // Show unlocked first, then locked, limit to 3
-                      {[...achievements]
-                          .sort((a, b) => (b.unlocked ? 1 : 0) - (a.unlocked ? 1 : 0))
-                          .slice(0, 3)
-                          .map((achievement) => (
-                        <YDCard
-                          key={achievement.id}
-                          className={`${!achievement.unlocked && "opacity-60 grayscale"}`}
-                        >
-                          <div className="flex items-center p-4">
-                            <div className={`p-3 ${achievement.unlocked ? "bg-amber-500/10" : "bg-muted"} rounded-lg mr-4`}>
-                              <Award
-                                size={24}
-                                className={achievement.unlocked ? "text-amber-500" : "text-muted-foreground"}
-                              />
-                            </div>
-                            <div>
-                              <h4 className="font-medium">{achievement.name}</h4>
-                              <p className="text-sm text-muted-foreground">{achievement.description}</p>
-                            </div>
-                          </div>
-                        </YDCard>
-                      ))}
-                    </div>
-                  ) : (
-                      <p className="text-muted-foreground">No achievements available yet.</p>
-                  )}
-                </div> 
-                */}
-                  
               </>
             )}
           </div>

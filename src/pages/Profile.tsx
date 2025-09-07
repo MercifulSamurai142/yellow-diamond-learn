@@ -1,5 +1,6 @@
-import { useState, useEffect, useRef } from "react";
-import { Camera, Save, Loader2, Cross, CrossIcon, Upload, Trash, Trash2 } from "lucide-react";
+// yellow-diamond-learn-main/src/pages/Profile.tsx
+import { useState, useEffect, useRef, useContext } from "react";
+import { Camera, Save, Loader2, Eye, EyeOff } from "lucide-react";
 import Header from "@/components/layout/Header";
 import Sidebar from "@/components/layout/Sidebar";
 import YDButton from "@/components/ui/YDButton";
@@ -8,18 +9,121 @@ import { useProfile, UserProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { useProgress } from "@/contexts/ProgressContext";
+import { LanguageContext } from "@/contexts/LanguageContext";
 import { supabase } from "@/integrations/supabase/client";
+
+// Translation object
+const translations = {
+  english: {
+    profile: "Profile",
+    personalInformation: "Personal Information",
+    fullName: "Full Name",
+    pslId: "PSL-ID",
+    emailAddress: "Email Address",
+    role: "Role",
+    region: "Region",
+    designation: "Designation", // New translation
+    email: "Email",
+    joined: "Joined",
+    learningProgress: "Learning Progress",
+    overallProgress: "Overall Progress",
+    modulesCompleted: "Modules Completed",
+    achievementsUnlocked: "Achievements Unlocked",
+    password: "Password",
+    currentPassword: "Current Password",
+    newPassword: "New Password",
+    confirmNewPassword: "Confirm New Password",
+    changePassword: "Change Password",
+    saveChanges: "Save Changes",
+    updateProfile: "Update Profile",
+    fetching: "Fetching...",
+    saving: "Saving...",
+    user: "User",
+    learner: "Learner",
+    notAvailable: "Not available",
+    recent: "Recent",
+    changeProfilePicture: "Change profile picture",
+    deleteProfilePicture: "Delete profile picture"
+  },
+  hindi: {
+    profile: "प्रोफाइल",
+    personalInformation: "व्यक्तिगत जानकारी",
+    fullName: "पूरा नाम",
+    pslId: "पीएसएल-आईडी",
+    emailAddress: "ईमेल पता",
+    role: "भूमिका",
+    region: "क्षेत्र",
+    designation: "पदनाम", // New translation
+    email: "ईमेल",
+    joined: "शामिल हुआ",
+    learningProgress: "सीखने की प्रगति",
+    overallProgress: "समग्र प्रगति",
+    modulesCompleted: "मॉड्यूल पूरे किए गए",
+    achievementsUnlocked: "उपलब्धियां अनलॉक की गईं",
+    password: "पासवर्ड",
+    currentPassword: "वर्तमान पासवर्ड",
+    newPassword: "नया पासवर्ड",
+    confirmNewPassword: "नए पासवर्ड की पुष्टि करें",
+    changePassword: "पासवर्ड बदलें",
+    saveChanges: "परिवर्तन सहेजें",
+    updateProfile: "प्रोफ़ाइल अपडेट करें",
+    fetching: "ला रहा है...",
+    saving: "सहेज रहा है...",
+    user: "उपयोगकर्ता",
+    learner: "शिक्षार्थी",
+    notAvailable: "उपलब्ध नहीं",
+    recent: "हाल ही में",
+    changeProfilePicture: "प्रोफाइल चित्र बदलें",
+    deleteProfilePicture: "प्रोफाइल चित्र हटाएं"
+  },
+  kannada: {
+    profile: "ಪ್ರೊಫೈಲ್",
+    personalInformation: "ವೈಯಕ್ತಿಕ ಮಾಹಿತಿ",
+    fullName: "ಪೂರ್ಣ ಹೆಸರು",
+    pslId: "ಪಿಎಸ್‌ಎಲ್-ಐಡಿ",
+    emailAddress: "ಇಮೇಲ್ ವಿಳಾಸ",
+    role: "ಪಾತ್ರ",
+    region: "ಪ್ರದೇಶ",
+    designation: "ಹುದ್ದೆ", // New translation
+    email: "ಇಮೇಲ್",
+    joined: "ಸೇರಿದರು",
+    learningProgress: "ಕಲಿಕೆಯ ಪ್ರಗತಿ",
+    overallProgress: "ಒಟ್ಟಾರೆ ಪ್ರಗತಿ",
+    modulesCompleted: "ಮಾಡ್ಯೂಲ್‌ಗಳು ಪೂರ್ಣಗೊಂಡಿವೆ",
+    achievementsUnlocked: "ಸಾಧನೆಗಳನ್ನು ಅನ್‌ಲಾಕ್ ಮಾಡಲಾಗಿದೆ",
+    password: "ಪಾಸ್‌ವರ್ಡ್",
+    currentPassword: "ಪ್ರಸ್ತುತ ಪಾಸ್‌ವರ್ಡ್",
+    newPassword: "ಹೊಸ ಪಾಸ್‌ವರ್ಡ್",
+    confirmNewPassword: "ಹೊಸ ಪಾಸ್‌ವರ್ಡ್ ದೃಢೀಕರಿಸಿ",
+    changePassword: "ಪಾಸ್‌ವರ್ಡ್ ಬದಲಾಯಿಸಿ",
+    saveChanges: "ಬದಲಾವಣೆಗಳನ್ನು ಉಳಿಸಿ",
+    updateProfile: "ಪ್ರೊಫೈಲ್ ನವೀಕರಿಸಿ",
+    fetching: "ತರುತ್ತಿದೆ...",
+    saving: "ಉಳಿಸುತ್ತಿದೆ...",
+    user: "ಬಳಕೆದಾರ",
+    learner: "ಕಲಿಯುವವರು",
+    notAvailable: "ಲಭ್ಯವಿಲ್ಲ",
+    recent: "ಇತ್ತೀಚಿನ",
+    changeProfilePicture: "ಪ್ರೊಫೈಲ್ ಚಿತ್ರವನ್ನು ಬದಲಾಯಿಸಿ",
+    deleteProfilePicture: "ಪ್ರೊಫೈಲ್ ಚಿತ್ರವನ್ನು ಅಳಿಸಿ"
+  }
+};
 
 const Profile = () => {
   const { profile, isLoading: isProfileLoading, updateProfile } = useProfile();
   const { user } = useAuth();
   const { progressStats, isLoading: isProgressLoadingStats } = useProgress();
+  const { currentLanguage } = useContext(LanguageContext)!;
 
-  const [formData, setFormData] = useState<Partial<UserProfile> & { region?: string }>({
+  const t = translations[currentLanguage] || translations.english;
+
+  const [formData, setFormData] = useState<Partial<UserProfile>>({
     name: "",
     email: "",
     role: "learner",
-    region: "North India", // Default or placeholder
+    region: "North India",
+    psl_id: null,
+    designation: "", // Added designation
   });
 
   const [passwordData, setPasswordData] = useState({
@@ -29,6 +133,8 @@ const Profile = () => {
   });
 
   const [updating, setUpdating] = useState(false);
+  const [isFetchingStagingData, setIsFetchingStagingData] = useState(false);
+  const [isPasswordChanging, setIsPasswordChanging] = useState(false);
   const [isUploadingPicture, setIsUploadingPicture] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -39,6 +145,9 @@ const Profile = () => {
         name: profile.name || "",
         email: profile.email || user?.email || "",
         role: profile.role || "learner",
+        region: profile.region || "",
+        psl_id: profile.psl_id || null,
+        designation: profile.designation || "", // Added designation
       }));
     } else if (user && !profile) {
        setFormData(prev => ({ ...prev, email: user.email || "" }));
@@ -63,10 +172,8 @@ const Profile = () => {
     if (!event.target.files || event.target.files.length === 0) {
       return;
     }
-
     const file = event.target.files[0];
     const MAX_FILE_SIZE = 1 * 1024 * 1024; // 1 MB
-
     if (file.size > MAX_FILE_SIZE) {
       toast({
         variant: "destructive",
@@ -75,7 +182,6 @@ const Profile = () => {
       });
       return;
     }
-
     if (!user) {
       toast({
         variant: "destructive",
@@ -84,35 +190,26 @@ const Profile = () => {
       });
       return;
     }
-
     setIsUploadingPicture(true);
-
     try {
-      const cleanFileName = file.name.replace(/[^a-zA-Z0-9-._]/g, '');
       const filePath = `profile-picture/${user.id}`;
-
       const { error: uploadError } = await supabase.storage
         .from("profile-pictures")
         .upload(filePath, file, {
             cacheControl: '3600',
             upsert: true,
         });
-
       if (uploadError) throw uploadError;
-
       const { data: publicUrlData } = supabase.storage
         .from("profile-pictures")
         .getPublicUrl(filePath);
-      
       if (!publicUrlData || !publicUrlData.publicUrl) {
         throw new Error("Could not get public URL for the uploaded image.");
       }
-      
-      await updateProfile({ 
+      await updateProfile({
         profile_picture: publicUrlData.publicUrl,
         updated_at: new Date().toISOString(),
       });
-
       toast({
         title: "Success",
         description: "Profile picture updated successfully.",
@@ -124,6 +221,54 @@ const Profile = () => {
       setIsUploadingPicture(false);
     }
   };
+
+  const handleFetchStagingData = async () => {
+    if (!user?.email) {
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "User email not found.",
+      });
+      return;
+    }
+    setIsFetchingStagingData(true);
+    try {
+      const { data, error } = await supabase
+        .from('user_import_staging')
+        .select('psl_id, name')
+        .eq('email', user.email)
+        .single();
+      if (error || !data) {
+        if (error && error.code !== 'PGRST116') {
+          throw error;
+        }
+        toast({
+          variant: "destructive",
+          title: "Not Found",
+          description: "Your PSL-ID could not be found. Please contact an administrator.",
+        });
+      } else {
+        setFormData(prev => ({
+          ...prev,
+          psl_id: data.psl_id,
+          name: data.name || prev.name,
+        }));
+        toast({
+          title: "Profile Data Loaded",
+          description: "Press the 'Save Changes' button to update your profile.",
+        });
+      }
+    } catch (error: any) {
+      console.error("Error fetching staging data:", error);
+      toast({
+        variant: "destructive",
+        title: "Error",
+        description: "Failed to fetch profile data. Please try again.",
+      });
+    } finally {
+      setIsFetchingStagingData(false);
+    }
+  };
   
   const handleSave = async () => {
     if (!profile) return;
@@ -131,17 +276,17 @@ const Profile = () => {
     try {
       const updateData: Partial<UserProfile> = {};
       if (formData.name !== profile.name) updateData.name = formData.name;
-      if (formData.region !== profile.region) updateData.region = formData.region; // <-- Add this line
+      if (formData.region !== profile.region) updateData.region = formData.region;
+      if (formData.designation !== profile.designation) updateData.designation = formData.designation; // Added designation
+      if (formData.psl_id && formData.psl_id !== profile.psl_id) updateData.psl_id = formData.psl_id;
 
       if (Object.keys(updateData).length === 0) {
         toast({ title: "No changes detected." });
         setUpdating(false);
         return;
       }
-
       const { error } = await updateProfile(updateData);
       if (error) throw error;
-
       toast({
         title: "Profile updated",
         description: "Your profile information has been updated successfully.",
@@ -159,34 +304,77 @@ const Profile = () => {
   };
 
   const handleChangePassword = async () => {
-    if (passwordData.newPassword !== passwordData.confirmPassword) {
+    setIsPasswordChanging(true);
+    try {
+      if (!passwordData.currentPassword) {
+        toast({
+          variant: "destructive",
+          title: "Missing Current Password",
+          description: "Please enter your current password to proceed.",
+        });
+        return;
+      }
+      if (passwordData.newPassword !== passwordData.confirmPassword) {
+        toast({
+          variant: "destructive",
+          title: "Password mismatch",
+          description: "New passwords do not match.",
+        });
+        return;
+      }
+      if (!passwordData.newPassword || passwordData.newPassword.length < 6) {
+        toast({
+          variant: "destructive",
+          title: "Invalid New Password",
+          description: "New password must be at least 6 characters long.",
+        });
+        return;
+      }
+      const { error: reauthError } = await supabase.auth.signInWithPassword({
+        email: user?.email!,
+        password: passwordData.currentPassword,
+      });
+      if (reauthError) {
+        if (reauthError.message.includes("Invalid login credentials")) {
+          toast({
+            variant: "destructive",
+            title: "Incorrect Current Password",
+            description: "The current password you entered is incorrect.",
+          });
+        } else {
+          toast({
+            variant: "destructive",
+            title: "Reauthentication Failed",
+            description: reauthError.message,
+          });
+        }
+        return;
+      }
+      const { error: updatePasswordError } = await supabase.auth.updateUser({
+        password: passwordData.newPassword,
+      });
+      if (updatePasswordError) {
+        throw updatePasswordError;
+      }
+      toast({
+        title: "Password Updated",
+        description: "Your password has been changed successfully.",
+      });
+      setPasswordData({
+        currentPassword: "",
+        newPassword: "",
+        confirmPassword: "",
+      });
+    } catch (error: any) {
+      console.error("Error changing password:", error);
       toast({
         variant: "destructive",
-        title: "Password mismatch",
-        description: "New passwords do not match.",
+        title: "Password Change Failed",
+        description: error.message || "There was a problem changing your password.",
       });
-      return;
+    } finally {
+      setIsPasswordChanging(false);
     }
-     if (!passwordData.newPassword || passwordData.newPassword.length < 6) {
-      toast({
-        variant: "destructive",
-        title: "Invalid Password",
-        description: "New password must be at least 6 characters long.",
-      });
-      return;
-     }
-
-    console.log("Password change data:", passwordData);
-    toast({
-      title: "Password update initiated",
-      description: "Check your email if confirmation is required.",
-    });
-
-    setPasswordData({
-      currentPassword: "",
-      newPassword: "",
-      confirmPassword: "",
-    });
   };
 
   if (isProfileLoading) {
@@ -225,7 +413,7 @@ const Profile = () => {
         <Header />
         <main className="flex-1 overflow-y-auto p-6">
           <div className="yd-container animate-fade-in">
-            <h2 className="yd-section-title mb-6">Profile</h2>
+            <h2 className="yd-section-title mb-6">{t.profile}</h2>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
               <div className="md:col-span-1">
                 <YDCard className="text-center p-6">
@@ -253,43 +441,34 @@ const Profile = () => {
                       onClick={handleAvatarClick}
                       className="absolute bottom-0 right-0 bg-primary text-white p-2 rounded-full hover:bg-primary/90 disabled:bg-primary/70"
                       disabled={isUploadingPicture}
-                      title="Change profile picture"
+                      title={t.changeProfilePicture}
                     >
                       {isUploadingPicture ? <Loader2 size={16} className="animate-spin" /> : <Camera size={16} />}
                     </button>
-                    {/* TODO:ADD DELETE BUTTON */}
-                    {/* <button
-                      onClick={handleAvatarClick}
-                      className="absolute bottom-0 right-0 bg-primary text-white p-2 rounded-full hover:bg-primary/90 disabled:bg-primary/70"
-                      disabled={isUploadingPicture}
-                      title="Delete profile picture"
-                    >
-                      {isUploadingPicture ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
-                    </button> */}
                   </div>
-                  <h3 className="text-xl font-semibold">{formData.name || 'User'}</h3>
-                  <p className="text-muted-foreground capitalize">{formData.role || 'Learner'}</p>
+                  <h3 className="text-xl font-semibold">{formData.name || t.user}</h3>
+                  <p className="text-muted-foreground capitalize">{formData.designation || formData.role || t.learner}</p>
                   <div className="border-t mt-4 pt-4">
                     <div className="flex justify-between text-sm py-2">
-                      <span className="text-muted-foreground">Email</span>
-                      <span>{formData.email || 'Not available'}</span>
+                      <span className="text-muted-foreground">{t.email}</span>
+                      <span>{formData.email || t.notAvailable}</span>
                     </div>
                     <div className="flex justify-between text-sm py-2">
-                      <span className="text-muted-foreground">Region</span>
+                      <span className="text-muted-foreground">{t.region}</span>
                       <span>{formData.region}</span>
                     </div>
                     <div className="flex justify-between text-sm py-2">
-                      <span className="text-muted-foreground">Joined</span>
+                      <span className="text-muted-foreground">{t.joined}</span>
                       <span>
                         {profile?.created_at
                           ? new Date(profile.created_at).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-                          : 'Recent'}
+                          : t.recent}
                       </span>
                     </div>
                   </div>
                 </YDCard>
                 <YDCard className="mt-6 p-6">
-                  <h3 className="font-semibold mb-4">Learning Progress</h3>
+                  <h3 className="font-semibold mb-4">{t.learningProgress}</h3>
                   {isProgressLoadingStats ? (
                     <div className="space-y-4 p-4">
                       <div className="h-4 bg-muted rounded w-3/4 animate-pulse"></div>
@@ -299,7 +478,7 @@ const Profile = () => {
                     <div className="space-y-4">
                       <div>
                         <div className="flex justify-between mb-1">
-                          <span className="text-sm">Overall Progress</span>
+                          <span className="text-sm">{t.overallProgress}</span>
                           <span className="text-sm font-medium">{progressStats.moduleProgress}%</span>
                         </div>
                         <div className="w-full bg-muted rounded-full h-2">
@@ -311,7 +490,7 @@ const Profile = () => {
                       </div>
                       <div>
                         <div className="flex justify-between mb-1">
-                          <span className="text-sm">Modules Completed</span>
+                          <span className="text-sm">{t.modulesCompleted}</span>
                           <span className="text-sm font-medium">
                             {progressStats.completedModules}/{progressStats.totalModules}
                           </span>
@@ -323,45 +502,59 @@ const Profile = () => {
                           ></div>
                         </div>
                       </div>
-                      <div>
-                        <div className="flex justify-between mb-1">
-                          <span className="text-sm">Achievements Unlocked</span>
-                          <span className="text-sm font-medium">
-                            {progressStats.unlockedAchievements}/{progressStats.totalAchievements}
-                          </span>
-                        </div>
-                        <div className="w-full bg-muted rounded-full h-2">
-                          <div
-                            className="bg-primary rounded-full h-2"
-                            style={{ width: `${achievementUnlockPercentage}%` }}
-                          ></div>
-                        </div>
-                      </div>
                     </div>
                   )}
                 </YDCard>
               </div>
               <div className="md:col-span-2">
                 <YDCard className="p-6">
-                  <h3 className="font-semibold mb-6">Personal Information</h3>
+                  <h3 className="font-semibold mb-6">{t.personalInformation}</h3>
                   <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleSave(); }}>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
+                        <label htmlFor="psl_id" className="block text-sm font-medium text-foreground">
+                          {t.pslId}
+                        </label>
+                        <input
+                          id="psl_id"
+                          name="psl_id"
+                          type="text"
+                          value={formData.psl_id || ''}
+                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                          disabled
+                        />
+                      </div>
+                       <div className="space-y-2">
+                        <label htmlFor="designation" className="block text-sm font-medium text-foreground">
+                          {t.designation}
+                        </label>
+                        <input
+                          id="designation"
+                          name="designation"
+                          type="text"
+                          value={formData.designation || ''}
+                          onChange={handleChange}
+                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          disabled
+                        />
+                      </div>
+                      <div className="space-y-2">
                         <label htmlFor="name" className="block text-sm font-medium text-foreground">
-                          Full Name
+                          {t.fullName}
                         </label>
                         <input
                           id="name"
                           name="name"
                           type="text"
-                          value={formData.name}
+                          value={formData.name || ''}
                           onChange={handleChange}
-                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-100"
+                          disabled
                         />
                       </div>
                       <div className="space-y-2">
                         <label htmlFor="email" className="block text-sm font-medium text-foreground">
-                          Email Address
+                          {t.emailAddress}
                         </label>
                         <input
                           id="email"
@@ -372,9 +565,10 @@ const Profile = () => {
                           disabled
                         />
                       </div>
+                      
                       <div className="space-y-2">
                         <label htmlFor="role" className="block text-sm font-medium text-foreground">
-                          Role
+                          {t.role}
                         </label>
                         <input
                           id="role"
@@ -387,12 +581,12 @@ const Profile = () => {
                       </div>
                       <div className="space-y-2">
                         <label htmlFor="region" className="block text-sm font-medium text-foreground">
-                          Region
+                          {t.region}
                         </label>
                         <select
                           id="region"
                           name="region"
-                          value={formData.region}
+                          value={formData.region || ''}
                           onChange={handleChange}
                           className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                         >
@@ -404,21 +598,44 @@ const Profile = () => {
                         </select>
                       </div>
                     </div>
-                    <div className="pt-4">
+                    <div className="pt-4 flex items-center gap-4">
                       <YDButton type="submit" disabled={updating || isProfileLoading}>
                         {updating ? <Loader2 size={16} className="mr-2 animate-spin"/> : <Save size={16} className="mr-2" />}
-                        {updating ? "Saving..." : "Save Changes"}
+                        {updating ? t.saving : t.saveChanges}
                       </YDButton>
+                      {!profile?.psl_id && (
+                        <YDButton type="button" variant="outline" onClick={handleFetchStagingData} disabled={isFetchingStagingData || updating}>
+                            {isFetchingStagingData ? <Loader2 size={16} className="mr-2 animate-spin"/> : null}
+                            {isFetchingStagingData ? t.fetching : t.updateProfile}
+                        </YDButton>
+                      )}
                     </div>
                   </form>
                 </YDCard>
+
                 <YDCard className="mt-6 p-6">
-                  <h3 className="font-semibold mb-6">Password</h3>
+                  <h3 className="font-semibold mb-6">{t.password}</h3>
                   <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleChangePassword(); }}>
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                       <div className="space-y-2">
+                        <label htmlFor="currentPassword" className="block text-sm font-medium text-foreground">
+                          {t.currentPassword}
+                        </label>
+                        <input
+                          id="currentPassword"
+                          name="currentPassword"
+                          type="password"
+                          value={passwordData.currentPassword}
+                          onChange={handlePasswordChange}
+                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          placeholder="••••••••"
+                          required
+                        />
+                      </div>
+                      <div></div>
+                      <div className="space-y-2">
                         <label htmlFor="newPassword" className="block text-sm font-medium text-foreground">
-                          New Password
+                          {t.newPassword}
                         </label>
                         <input
                           id="newPassword"
@@ -428,11 +645,13 @@ const Profile = () => {
                           onChange={handlePasswordChange}
                           className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                           placeholder="••••••••"
+                          required
+                          minLength={6}
                         />
                       </div>
                       <div className="space-y-2">
-                         <label htmlFor="confirmPassword" className="block text-sm font-medium text-foreground">
-                          Confirm New Password
+                        <label htmlFor="confirmPassword" className="block text-sm font-medium text-foreground">
+                          {t.confirmNewPassword}
                         </label>
                         <input
                           id="confirmPassword"
@@ -442,12 +661,15 @@ const Profile = () => {
                           onChange={handlePasswordChange}
                           className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                           placeholder="••••••••"
+                          required
+                          minLength={6}
                         />
                       </div>
                     </div>
                     <div className="pt-4">
-                      <YDButton variant="outline" type="submit">
-                        Change Password
+                      <YDButton variant="outline" type="submit" disabled={isPasswordChanging}>
+                        {isPasswordChanging ? <Loader2 size={16} className="mr-2 animate-spin"/> : null}
+                        {t.changePassword}
                       </YDButton>
                     </div>
                   </form>

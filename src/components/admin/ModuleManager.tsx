@@ -7,16 +7,22 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Pencil, Trash2, Plus, Loader2 } from "lucide-react";
-import { Module } from "@/pages/Admin";
+import { Pencil, Trash2, Plus, Loader2, X } from "lucide-react";
+import { Module, ModuleDesignation, ModuleRegion } from "@/pages/Admin";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Badge } from "@/components/ui/badge";
 
 interface ModuleManagerProps {
   modules: Module[];
+  moduleDesignations: ModuleDesignation[];
+  moduleRegions: ModuleRegion[];
   onModulesUpdate: (modules: Module[]) => void;
   refreshData: () => Promise<void>;
 }
 
-const ModuleManager = ({ modules, onModulesUpdate, refreshData }: ModuleManagerProps) => {
+const REGION_OPTIONS = ["North", "South", "East", "West", "Central"];
+
+const ModuleManager = ({ modules, moduleDesignations, moduleRegions, onModulesUpdate, refreshData }: ModuleManagerProps) => {
   const [isAddingModule, setIsAddingModule] = useState(false);
   const [editingModuleId, setEditingModuleId] = useState<string | null>(null);
   const [newModule, setNewModule] = useState({
@@ -26,86 +32,101 @@ const ModuleManager = ({ modules, onModulesUpdate, refreshData }: ModuleManagerP
     video_url: null as string | null,
     language: 'english',
   });
+  const [designations, setDesignations] = useState<string[]>([]);
+  const [designationInput, setDesignationInput] = useState("");
+  const [regions, setRegions] = useState<string[]>([]);
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [availableVideos, setAvailableVideos] = useState<{ name: string }[]>([]);
   const [isListingVideos, setIsListingVideos] = useState(false);
 
   const handleVideoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setVideoFile(file);
+    if (e.target.files?.[0]) {
+      setVideoFile(e.target.files[0]);
+    }
+  };
+  
+  const handleDesignationKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "Enter" || e.key === "Tab") {
+      e.preventDefault();
+      const newDesignation = designationInput.trim();
+      if (newDesignation && !designations.includes(newDesignation)) {
+        setDesignations([...designations, newDesignation]);
+        setDesignationInput("");
+      }
+    }
+  };
+
+  const removeDesignation = (designationToRemove: string) => {
+    setDesignations(designations.filter(d => d !== designationToRemove));
+  };
+  
+  const handleRegionChange = (region: string, checked: boolean) => {
+    setRegions(prev => checked ? [...prev, region] : prev.filter(r => r !== region));
+  };
+
+  const saveModuleDependencies = async (moduleId: string) => {
+    // Delete existing designations and regions for this module
+    const { error: deleteDesignationError } = await supabase.from('module_designation').delete().eq('module_id', moduleId);
+    if (deleteDesignationError) throw deleteDesignationError;
+    
+    const { error: deleteRegionError } = await supabase.from('module_region').delete().eq('module_id', moduleId);
+    if (deleteRegionError) throw deleteRegionError;
+
+    // Insert new designations
+    if (designations.length > 0) {
+      const designationInserts = designations.map(d => ({ module_id: moduleId, designation: d }));
+      const { error: insertDesignationError } = await supabase.from('module_designation').insert(designationInserts);
+      if (insertDesignationError) throw insertDesignationError;
+    }
+
+    // Insert new regions
+    if (regions.length > 0) {
+      const regionInserts = regions.map(r => ({ module_id: moduleId, region: r }));
+      const { error: insertRegionError } = await supabase.from('module_region').insert(regionInserts);
+      if (insertRegionError) throw insertRegionError;
     }
   };
 
   const handleAddModule = async () => {
     try {
       if (!newModule.name) {
-        toast({
-          title: "Error",
-          description: "Module name is required",
-          variant: "destructive",
-        });
+        toast({ title: "Error", description: "Module name is required", variant: "destructive" });
         return;
       }
 
       const { data: moduleData, error: moduleError } = await supabase
-        .from("modules")
-        .insert({
-          name: newModule.name,
-          description: newModule.description,
-          order: newModule.order,
-          language: newModule.language,
-          video_url: null
-        })
-        .select()
-        .single();
+        .from("modules").insert({ ...newModule, video_url: null }).select().single();
 
       if (moduleError) throw moduleError;
       if (!moduleData) throw new Error("Failed to create module.");
+
+      await saveModuleDependencies(moduleData.id);
 
       let finalModuleData = moduleData;
 
       if (videoFile) {
         setIsUploading(true);
-        const fileExtension = videoFile.name.split('.').pop();
         const filePath = `public/${moduleData.id}/${videoFile.name}`;
-        const { error: uploadError } = await supabase.storage
-          .from("module-videos")
-          .upload(filePath, videoFile, { upsert: true });
-        
+        const { error: uploadError } = await supabase.storage.from("module-videos").upload(filePath, videoFile, { upsert: true });
         setIsUploading(false);
         if (uploadError) throw uploadError;
 
         const { data: urlData } = supabase.storage.from("module-videos").getPublicUrl(filePath);
-
         const { data: updatedData, error: updateError } = await supabase
-          .from("modules")
-          .update({ video_url: urlData.publicUrl })
-          .eq("id", moduleData.id)
-          .select()
-          .single();
-        
+          .from("modules").update({ video_url: urlData.publicUrl }).eq("id", moduleData.id).select().single();
         if (updateError) throw updateError;
         finalModuleData = updatedData;
       }
 
-      toast({
-        title: "Success",
-        description: "Module added successfully",
-      });
-      
+      toast({ title: "Success", description: "Module added successfully" });
       onModulesUpdate([...modules, finalModuleData]);
       cancelModuleAction();
       await refreshData();
 
     } catch (error: any) {
       console.error("Error adding module:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: `Failed to add module: ${error.message}`,
-      });
+      toast({ variant: "destructive", title: "Error", description: `Failed to add module: ${error.message}` });
     }
   };
 
@@ -121,37 +142,23 @@ const ModuleManager = ({ modules, onModulesUpdate, refreshData }: ModuleManagerP
       video_url: moduleToEdit.video_url || null,
       language: moduleToEdit.language || "english",
     });
+    
+    const currentDesignations = moduleDesignations.filter(md => md.module_id === moduleId).map(md => md.designation);
+    setDesignations(currentDesignations);
+
+    const currentRegions = moduleRegions.filter(mr => mr.module_id === moduleId).map(mr => mr.region);
+    setRegions(currentRegions);
+    
     setIsAddingModule(true);
     fetchAvailableVideos(moduleId);
   };
   
-  const fetchAvailableVideos = async (moduleId: string) => {
-    setIsListingVideos(true);
-    try {
-        const { data, error } = await supabase.storage
-            .from('module-videos')
-            .list(`public/${moduleId}`);
-        if (error) throw error;
-        setAvailableVideos(data || []);
-    } catch (error) {
-        console.error("Error listing module videos:", error);
-        toast({ variant: 'destructive', title: 'Could not fetch video list.' });
-        setAvailableVideos([]);
-    } finally {
-        setIsListingVideos(false);
-    }
-  };
-
   const handleUpdateModule = async () => {
     if (!editingModuleId) return;
 
     try {
       if (!newModule.name) {
-        toast({
-          title: "Error",
-          description: "Module name is required",
-          variant: "destructive",
-        });
+        toast({ title: "Error", description: "Module name is required", variant: "destructive" });
         return;
       }
 
@@ -159,12 +166,8 @@ const ModuleManager = ({ modules, onModulesUpdate, refreshData }: ModuleManagerP
 
       if (videoFile) {
         setIsUploading(true);
-        const fileExtension = videoFile.name.split('.').pop();
         const filePath = `public/${editingModuleId}/${videoFile.name}`;
-        const { error: uploadError } = await supabase.storage
-          .from("module-videos")
-          .upload(filePath, videoFile, { upsert: true });
-        
+        const { error: uploadError } = await supabase.storage.from("module-videos").upload(filePath, videoFile, { upsert: true });
         setIsUploading(false);
         if (uploadError) throw uploadError;
 
@@ -173,106 +176,46 @@ const ModuleManager = ({ modules, onModulesUpdate, refreshData }: ModuleManagerP
       }
 
       const { data: updatedModule, error } = await supabase
-        .from("modules")
-        .update({
-          name: newModule.name,
-          description: newModule.description,
-          order: newModule.order,
-          language: newModule.language,
-          video_url: finalVideoUrl,
-        })
-        .eq("id", editingModuleId)
-        .select()
-        .single();
+        .from("modules").update({ ...newModule, video_url: finalVideoUrl }).eq("id", editingModuleId).select().single();
 
       if (error) throw error;
-
-      toast({
-        title: "Success",
-        description: "Module updated successfully",
-      });
-
-      const updatedModules = modules.map(module => 
-        module.id === editingModuleId ? updatedModule : module
-      );
-      onModulesUpdate(updatedModules);
       
+      await saveModuleDependencies(editingModuleId);
+
+      toast({ title: "Success", description: "Module updated successfully" });
       cancelModuleAction();
       await refreshData();
     } catch (error: any) {
       console.error("Error updating module:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: `Failed to update module: ${error.message}`,
-      });
-    }
-  };
-  
-  const handleRemoveVideo = async (videoName: string) => {
-    if (!editingModuleId) return;
-
-    const isConfirmed = window.confirm(`Are you sure you want to permanently delete the video "${videoName}"? This action cannot be undone.`);
-    if (!isConfirmed) return;
-
-    try {
-      const filePath = `public/${editingModuleId}/${videoName}`;
-      const { error } = await supabase.storage.from('module-videos').remove([filePath]);
-      
-      if (error) throw error;
-      
-      const { data: moduleData } = await supabase.from('modules').select('video_url').eq('id', editingModuleId).single();
-      const activeVideoUrl = moduleData?.video_url;
-
-      const deletedVideoUrlPart = `/${filePath}`;
-      if (activeVideoUrl && activeVideoUrl.endsWith(deletedVideoUrlPart)) {
-          await supabase.from('modules').update({ video_url: null }).eq('id', editingModuleId);
-          setNewModule(prev => ({ ...prev, video_url: null }));
-      }
-      
-      toast({ title: "Video Removed", description: "The video file has been deleted." });
-      fetchAvailableVideos(editingModuleId);
-
-    } catch(err: any) {
-      console.error("Error removing video:", err);
-      toast({ variant: 'destructive', title: 'Error', description: `Could not remove video: ${err.message}` });
+      toast({ variant: "destructive", title: "Error", description: `Failed to update module: ${error.message}` });
     }
   };
 
   const handleDeleteModule = async (moduleId: string) => {
     try {
-      const { data: files, error: listError } = await supabase.storage
-        .from('module-videos')
-        .list(`public/${moduleId}`);
-      
-      if (listError) throw listError;
-      
-      if (files && files.length > 0) {
-        const filePaths = files.map(file => `public/${moduleId}/${file.name}`);
-        await supabase.storage.from('module-videos').remove(filePaths);
-      }
-
-      const { error } = await supabase
-        .from("modules")
-        .delete()
-        .eq("id", moduleId);
-
+      await supabase.storage.from('module-videos').remove([`public/${moduleId}`]);
+      const { error } = await supabase.from("modules").delete().eq("id", moduleId);
       if (error) throw error;
 
-      toast({
-        title: "Success",
-        description: "Module and its videos deleted successfully",
-      });
-
-      onModulesUpdate(modules.filter(module => module.id !== moduleId));
+      toast({ title: "Success", description: "Module deleted successfully" });
       await refreshData();
     } catch (error) {
       console.error("Error deleting module:", error);
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to delete module. Make sure there are no lessons attached to this module.",
-      });
+      toast({ variant: "destructive", title: "Error", description: "Failed to delete module. Make sure there are no lessons attached to this module." });
+    }
+  };
+  
+  const fetchAvailableVideos = async (moduleId: string) => {
+    setIsListingVideos(true);
+    try {
+      const { data, error } = await supabase.storage.from('module-videos').list(`public/${moduleId}`);
+      if (error) throw error;
+      setAvailableVideos(data || []);
+    } catch (error) {
+      console.error("Error listing module videos:", error);
+      toast({ variant: 'destructive', title: 'Could not fetch video list.' });
+    } finally {
+      setIsListingVideos(false);
     }
   };
 
@@ -280,10 +223,11 @@ const ModuleManager = ({ modules, onModulesUpdate, refreshData }: ModuleManagerP
     setIsAddingModule(false);
     setEditingModuleId(null);
     setNewModule({ name: "", description: "", order: modules.length + 1, video_url: null, language: 'english' });
+    setDesignations([]);
+    setDesignationInput("");
+    setRegions([]);
     setVideoFile(null);
     setIsUploading(false);
-    setAvailableVideos([]);
-    setIsListingVideos(false);
   };
 
   return (
@@ -302,26 +246,17 @@ const ModuleManager = ({ modules, onModulesUpdate, refreshData }: ModuleManagerP
 
       {isAddingModule && (
         <YDCard className="p-6 mb-6">
-          <h4 className="text-lg font-medium mb-4">
-            {editingModuleId ? "Edit Module" : "Add New Module"}
-          </h4>
+          <h4 className="text-lg font-medium mb-4">{editingModuleId ? "Edit Module" : "Add New Module"}</h4>
           <div className="space-y-4">
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <Label>Module Name</Label>
-                <Input
-                  id="moduleName"
-                  value={newModule.name}
-                  onChange={(e) => setNewModule({ ...newModule, name: e.target.value })}
-                  placeholder="Enter module name"
-                />
+                <Input value={newModule.name} onChange={(e) => setNewModule({ ...newModule, name: e.target.value })} placeholder="Enter module name" />
               </div>
               <div>
                 <Label>Module Language</Label>
                 <Select value={newModule.language} onValueChange={(value) => setNewModule({ ...newModule, language: value })}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Language" />
-                  </SelectTrigger>
+                  <SelectTrigger><SelectValue placeholder="Language" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="english">English</SelectItem>
                     <SelectItem value="hindi">हिन्दी (Hindi)</SelectItem>
@@ -330,75 +265,66 @@ const ModuleManager = ({ modules, onModulesUpdate, refreshData }: ModuleManagerP
                 </Select>
               </div>
             </div>
-            
             <div>
               <Label htmlFor="moduleDescription">Description</Label>
-              <Textarea
-                id="moduleDescription"
-                value={newModule.description}
-                onChange={(e) => setNewModule({ ...newModule, description: e.target.value })}
-                placeholder="Enter module description"
-                rows={3}
-              />
+              <Textarea id="moduleDescription" value={newModule.description} onChange={(e) => setNewModule({ ...newModule, description: e.target.value })} placeholder="Enter module description" rows={3} />
+            </div>
+            
+            {/* Designations Input */}
+            <div>
+                <Label htmlFor="designationInput">Module Designations</Label>
+                <Input 
+                    id="designationInput"
+                    value={designationInput} 
+                    onChange={e => setDesignationInput(e.target.value)} 
+                    onKeyDown={handleDesignationKeyDown}
+                    placeholder="Type designation and press Enter/Tab" 
+                />
+                <div className="flex flex-wrap gap-2 mt-2">
+                    {designations.map(d => (
+                        <Badge key={d} variant="secondary" className="flex items-center gap-1">
+                            {d}
+                            <button onClick={() => removeDesignation(d)} className="rounded-full hover:bg-muted-foreground/20">
+                                <X size={12} />
+                            </button>
+                        </Badge>
+                    ))}
+                </div>
+            </div>
+
+            {/* Regions Input */}
+            <div>
+                <Label>Module Regions</Label>
+                <div className="grid grid-cols-3 gap-2 p-2 border rounded-md mt-1">
+                    {REGION_OPTIONS.map(region => (
+                        <div key={region} className="flex items-center space-x-2">
+                            <Checkbox 
+                                id={`region-${region}`} 
+                                checked={regions.includes(region)} 
+                                onCheckedChange={(checked) => handleRegionChange(region, !!checked)}
+                            />
+                            <Label htmlFor={`region-${region}`} className="text-sm font-normal">{region}</Label>
+                        </div>
+                    ))}
+                </div>
             </div>
 
             <div>
               <Label htmlFor="moduleVideo">Upload Module Intro Video (Optional)</Label>
-              <Input
-                id="moduleVideo"
-                type="file"
-                accept="video/mp4,video/webm"
-                onChange={handleVideoFileChange}
-                disabled={isUploading}
-              />
+              <Input id="moduleVideo" type="file" accept="video/mp4,video/webm" onChange={handleVideoFileChange} disabled={isUploading} />
               {isUploading && <p className="text-sm text-muted-foreground mt-2 flex items-center"><Loader2 className="mr-2 h-4 w-4 animate-spin"/>Uploading video...</p>}
-              {videoFile && <p className="mt-2 text-sm text-muted-foreground">New video to upload: {videoFile.name}</p>}
             </div>
 
-            {editingModuleId && (
-              <div>
-                <Label>Available Videos</Label>
-                {isListingVideos ? (
-                  <p className="text-sm text-muted-foreground">Loading video list...</p>
-                ) : availableVideos.length > 0 ? (
-                  <div className="mt-2 space-y-2 rounded-md border p-2">
-                    {availableVideos.map(video => (
-                      <div key={video.name} className="flex items-center justify-between text-sm">
-                        <span>{video.name}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleRemoveVideo(video.name)}
-                          className="text-red-500 hover:underline font-medium"
-                        >
-                          Remove
-                        </button>
-                      </div>
-                    ))}
-                  </div>
-                ) : (<p className="text-sm text-muted-foreground mt-1">No videos uploaded for this module.</p>)}
-              </div>
-            )}
-            
             <div>
               <Label htmlFor="moduleOrder">Order</Label>
-              <Input
-                id="moduleOrder"
-                type="number"
-                value={newModule.order}
-                onChange={(e) => setNewModule({ ...newModule, order: parseInt(e.target.value) || 1 })}
-                min="1"
-              />
+              <Input id="moduleOrder" type="number" value={newModule.order} onChange={(e) => setNewModule({ ...newModule, order: parseInt(e.target.value) || 1 })} min="1" />
             </div>
             
             <div className="flex space-x-2">
-              {editingModuleId ? (
-                <YDButton onClick={handleUpdateModule}>Update Module</YDButton>
-              ) : (
-                <YDButton onClick={handleAddModule}>Add Module</YDButton>
-              )}
-              <YDButton variant="outline" onClick={cancelModuleAction}>
-                Cancel
+              <YDButton onClick={editingModuleId ? handleUpdateModule : handleAddModule}>
+                {editingModuleId ? "Update Module" : "Add Module"}
               </YDButton>
+              <YDButton variant="outline" onClick={cancelModuleAction}>Cancel</YDButton>
             </div>
           </div>
         </YDCard>
@@ -406,41 +332,21 @@ const ModuleManager = ({ modules, onModulesUpdate, refreshData }: ModuleManagerP
 
       <div className="space-y-4">
         {modules.length === 0 ? (
-          <YDCard>
-            <div className="p-6 text-center">
-              <p className="text-muted-foreground">No modules found. Create your first module.</p>
-            </div>
-          </YDCard>
+          <YDCard><div className="p-6 text-center"><p className="text-muted-foreground">No modules found.</p></div></YDCard>
         ) : (
-          modules
-            .sort((a, b) => a.order - b.order)
-            .map((module) => (
+          modules.sort((a, b) => a.order - b.order).map((module) => (
               <YDCard key={module.id} className="p-6">
                 <div className="flex justify-between items-start">
                   <div>
                     <div className="flex items-center">
-                      <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-semibold bg-primary/20 text-primary rounded-full mr-2">
-                        {module.order}
-                      </span>
+                      <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-semibold bg-primary/20 text-primary rounded-full mr-2">{module.order}</span>
                       <h4 className="text-lg font-medium">{module.name}</h4>
                     </div>
                     <p className="text-muted-foreground mt-1">{module.description}</p>
                   </div>
                   <div className="flex space-x-2">
-                    <YDButton
-                      variant="outline"
-                      size="icon"
-                      onClick={() => handleEditModule(module.id)}
-                    >
-                      <Pencil size={16} />
-                    </YDButton>
-                    <YDButton
-                      variant="destructive"
-                      size="icon"
-                      onClick={() => handleDeleteModule(module.id)}
-                    >
-                      <Trash2 size={16} />
-                    </YDButton>
+                    <YDButton variant="outline" size="icon" onClick={() => handleEditModule(module.id)}><Pencil size={16} /></YDButton>
+                    <YDButton variant="destructive" size="icon" onClick={() => handleDeleteModule(module.id)}><Trash2 size={16} /></YDButton>
                   </div>
                 </div>
               </YDCard>

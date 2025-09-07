@@ -1,3 +1,4 @@
+// yellow-diamond-learn-main/src/contexts/AuthContext.tsx
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -10,7 +11,7 @@ type AuthContextType = {
   session: Session | null;
   isLoading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
-  signUp: (email: string, password: string, fullName: string) => Promise<void>;
+  signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
 };
@@ -66,7 +67,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           setUser(session?.user ?? null);
 
           if (event === 'SIGNED_IN' && session) {
-            // Only navigate if explicitly signing in
+            // Check if the user is on the /reset-password page after a password reset.
+            // If so, do NOT redirect to dashboard immediately. The ResetPasswordPage will handle navigation.
+            if (location.pathname === '/reset-password') {
+                return; // Let ResetPasswordPage handle post-update navigation
+            }
+            // Only navigate if explicitly signing in and not on a special auth page
             if (location.pathname === '/login' || location.pathname === '/') {
               navigate('/dashboard', { replace: true });
             }
@@ -75,7 +81,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               description: 'You have successfully signed in.',
             });
           }
-          
+
           if (event === 'SIGNED_OUT') {
             // Only navigate if explicitly signing out
             if (location.pathname !== '/login' && location.pathname !== '/') {
@@ -100,7 +106,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const signIn = async (email: string, password: string) => {
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
-      
+
       if (error) {
         toast({
           variant: 'destructive',
@@ -114,26 +120,67 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Sign up with email, password, and name
-  const signUp = async (email: string, password: string, fullName: string) => {
+  // Sign up with email and password
+  const signUp = async (email: string, password: string) => {
     try {
-      const { error } = await supabase.auth.signUp({
+      // 1. Check if email exists in the staging table for authorization
+      const { data: stagedUser, error: stageError } = await supabase
+        .from('user_import_staging')
+        .select('*')
+        .eq('email', email)
+        .single();
+
+      if (stageError && stageError.code !== 'PGRST116') { // PGRST116 means no rows are found.
+        throw stageError;
+      }
+
+      if (!stagedUser) {
+        toast({
+          variant: 'destructive',
+          title: 'Unauthorized user',
+          description: 'This email is not authorized to create an account.',
+        });
+        return;
+      }
+      
+      // 2. Check if the user account already exists in the public.users table
+      const { data: existingUser, error: existingUserError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('email', email)
+        .single();
+
+      if (existingUserError && existingUserError.code !== 'PGRST116') {
+          throw existingUserError;
+      }
+
+      if (existingUser) {
+          toast({
+              variant: 'destructive',
+              title: 'Account exists',
+              description: 'An account with this email already exists. Please sign in.',
+          });
+          return;
+      }
+
+      // 3. If authorized and not existing, proceed with signup
+      const { error: signUpError } = await supabase.auth.signUp({
         email,
         password,
         options: {
           data: {
-            name: fullName,
+            name: stagedUser.name || 'New User',
           },
         },
       });
 
-      if (error) {
+      if (signUpError) {
         toast({
           variant: 'destructive',
           title: 'Sign up failed',
-          description: error.message,
+          description: signUpError.message,
         });
-        throw error;
+        throw signUpError;
       } else {
         toast({
           title: 'Account created',
@@ -141,6 +188,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
       }
     } catch (error) {
+      if (error instanceof Error) {
+        console.error("Sign up process failed:", error.message);
+      }
       throw error;
     }
   };
@@ -168,7 +218,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,
       });
-      
+
       if (error) {
         toast({
           variant: 'destructive',
