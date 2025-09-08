@@ -5,6 +5,7 @@ import Header from "@/components/layout/Header";
 import Sidebar from "@/components/layout/Sidebar";
 import { YDCard } from "@/components/ui/YDCard";
 import { supabase } from "@/integrations/supabase/client";
+import { cn } from "@/lib/utils";
 import { LanguageContext } from '@/contexts/LanguageContext'; // Import LanguageContext
 
 type Module = {
@@ -71,14 +72,28 @@ const Modules = () => {
                   </div>
                 ) : (
                   modules.map((module) => (
-                    <Link to={`/modules/${module.id}`} key={module.id}>
-                      <YDCard className="h-full transition-all duration-200 hover:shadow-lg hover:-translate-y-1">
+                    <Link to={`/modules/${module.id}`} key={module.id} className="group">
+                      <YDCard className={cn(
+                        "h-full transition-all duration-200 group-hover:shadow-lg group-hover:-translate-y-1",
+                        module.order === 1 && "bg-primary border-orange-600 text-primary-foreground"
+                      )}>
                         <div className="p-4">
-                          <div className="flex items-center text-sm text-muted-foreground">
+                          <div className={cn(
+                            "flex items-center text-sm",
+                            module.order === 1 ? "text-primary-foreground/80" : "text-muted-foreground"
+                          )}>
                             <span>Module {module.order}</span>
                           </div>
-                          <h3 className="text-xl font-semibold text-yd-navy mb-2">{module.name}</h3>
-                          <p className="text-muted-foreground mb-4">{module.description}</p>                          
+                          <h3 className={cn(
+                            "text-xl font-semibold mb-2",
+                             module.order === 1 ? "text-white" : "text-yd-navy"
+                          )}>
+                            {module.name}
+                          </h3>
+                          <p className={cn(
+                            "mb-4 line-clamp-2 md:line-clamp-none min-h-[2.5rem]",
+                            module.order === 1 ? "text-primary-foreground/90" : "text-muted-foreground"
+                          )}>{module.description}</p>                          
                         </div>
                       </YDCard>
                     </Link>
