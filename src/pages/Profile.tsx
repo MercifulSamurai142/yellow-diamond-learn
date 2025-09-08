@@ -22,7 +22,8 @@ const translations = {
     emailAddress: "Email Address",
     role: "Role",
     region: "Region",
-    designation: "Designation", // New translation
+    state: "State",
+    designation: "Designation",
     email: "Email",
     joined: "Joined",
     learningProgress: "Learning Progress",
@@ -53,7 +54,8 @@ const translations = {
     emailAddress: "ईमेल पता",
     role: "भूमिका",
     region: "क्षेत्र",
-    designation: "पदनाम", // New translation
+    state: "राज्य",
+    designation: "पदनाम",
     email: "ईमेल",
     joined: "शामिल हुआ",
     learningProgress: "सीखने की प्रगति",
@@ -84,7 +86,8 @@ const translations = {
     emailAddress: "ಇಮೇಲ್ ವಿಳಾಸ",
     role: "ಪಾತ್ರ",
     region: "ಪ್ರದೇಶ",
-    designation: "ಹುದ್ದೆ", // New translation
+    state: "ರಾಜ್ಯ",
+    designation: "ಹುದ್ದೆ",
     email: "ಇಮೇಲ್",
     joined: "ಸೇರಿದರು",
     learningProgress: "ಕಲಿಕೆಯ ಪ್ರಗತಿ",
@@ -121,9 +124,10 @@ const Profile = () => {
     name: "",
     email: "",
     role: "learner",
-    region: "North India",
+    region: "",
     psl_id: null,
-    designation: "", // Added designation
+    designation: "",
+    state: "",
   });
 
   const [passwordData, setPasswordData] = useState({
@@ -147,7 +151,8 @@ const Profile = () => {
         role: profile.role || "learner",
         region: profile.region || "",
         psl_id: profile.psl_id || null,
-        designation: profile.designation || "", // Added designation
+        designation: profile.designation || "",
+        state: profile.state || "",
       }));
     } else if (user && !profile) {
        setFormData(prev => ({ ...prev, email: user.email || "" }));
@@ -235,7 +240,7 @@ const Profile = () => {
     try {
       const { data, error } = await supabase
         .from('user_import_staging')
-        .select('psl_id, name, designation, region, state, role')
+        .select('psl_id, name, designation, region, state')
         .eq('email', user.email)
         .single();
       if (error || !data) {
@@ -252,6 +257,9 @@ const Profile = () => {
           ...prev,
           psl_id: data.psl_id,
           name: data.name || prev.name,
+          designation: data.designation || prev.designation,
+          region: data.region || prev.region,
+          state: data.state || prev.state,
         }));
         toast({
           title: "Profile Data Loaded",
@@ -277,8 +285,9 @@ const Profile = () => {
       const updateData: Partial<UserProfile> = {};
       if (formData.name !== profile.name) updateData.name = formData.name;
       if (formData.region !== profile.region) updateData.region = formData.region;
-      if (formData.designation !== profile.designation) updateData.designation = formData.designation; // Added designation
+      if (formData.designation !== profile.designation) updateData.designation = formData.designation;
       if (formData.psl_id && formData.psl_id !== profile.psl_id) updateData.psl_id = formData.psl_id;
+      if (formData.state !== profile.state) updateData.state = formData.state;
 
       if (Object.keys(updateData).length === 0) {
         toast({ title: "No changes detected." });
@@ -453,9 +462,9 @@ const Profile = () => {
                       <span className="text-muted-foreground">{t.email}</span>
                       <span>{formData.email || t.notAvailable}</span>
                     </div>
-                    <div className="flex justify-between text-sm py-2">
-                      <span className="text-muted-foreground">{t.region}</span>
-                      <span>{formData.region}</span>
+                     <div className="flex justify-between text-sm py-2">
+                      <span className="text-muted-foreground">{t.state}</span>
+                      <span>{formData.state || t.notAvailable}</span>
                     </div>
                     <div className="flex justify-between text-sm py-2">
                       <span className="text-muted-foreground">{t.joined}</span>
@@ -533,7 +542,6 @@ const Profile = () => {
                           name="designation"
                           type="text"
                           value={formData.designation || ''}
-                          onChange={handleChange}
                           className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                           disabled
                         />
@@ -579,7 +587,20 @@ const Profile = () => {
                           disabled
                         />
                       </div>
-                      <div className="space-y-2">
+                       <div className="space-y-2">
+                        <label htmlFor="state" className="block text-sm font-medium text-foreground">
+                          {t.state}
+                        </label>
+                        <input
+                          id="state"
+                          name="state"
+                          type="text"
+                          value={formData.state || ''}
+                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          disabled
+                        />
+                      </div>
+                      <div className="space-y-2 md:col-span-2">
                         <label htmlFor="region" className="block text-sm font-medium text-foreground">
                           {t.region}
                         </label>
