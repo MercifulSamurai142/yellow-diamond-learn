@@ -80,13 +80,13 @@ const AuthPage = () => {
       <div className="bg-yd-navy md:w-1/2 p-8 flex flex-col justify-center items-center">
         <div className="max-w-md text-center">
           <div className="mb-6 inline-flex items-center justify-center p-4 bg-yd-yellow rounded-xl">
-            <h1 className="text-2xl md:text-3xl font-bold text-yd-navy">Yellow Diamond</h1>
+            <h1 className="text-2xl md:text-3xl font-bold text-yd-navy">Yellow Diamond Academy</h1>
           </div>
           <h2 className="text-2xl md:text-4xl font-bold text-white mb-4">Learning Management System</h2>
           <p className="text-yd-lightGray mb-8">Empowering our sales team with knowledge and skills for excellence in FMCG distribution.</p>
           <div className="hidden md:block">
             <img 
-              src="https://img.freepik.com/free-vector/online-learning-isometric-concept_1284-17947.jpg?w=900&t=st=1712754000~exp=1712754600~hmac=9ab0a7a5c2c741994682fd8d34dfd507986e84b927b6f1235eddc4a28ccc2022" 
+              src="icon.jpeg" 
               alt="E-learning illustration" 
               className="max-w-xs mx-auto rounded-lg shadow-lg"
             />
