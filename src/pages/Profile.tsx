@@ -235,7 +235,7 @@ const Profile = () => {
     try {
       const { data, error } = await supabase
         .from('user_import_staging')
-        .select('psl_id, name')
+        .select('psl_id, name, designation, region, state, role')
         .eq('email', user.email)
         .single();
       if (error || !data) {
@@ -520,7 +520,7 @@ const Profile = () => {
                           name="psl_id"
                           type="text"
                           value={formData.psl_id || ''}
-                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                           disabled
                         />
                       </div>
@@ -548,7 +548,7 @@ const Profile = () => {
                           type="text"
                           value={formData.name || ''}
                           onChange={handleChange}
-                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-100"
+                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                           disabled
                         />
                       </div>
@@ -561,7 +561,7 @@ const Profile = () => {
                           name="email"
                           type="email"
                           value={formData.email}
-                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                           disabled
                         />
                       </div>
@@ -575,7 +575,7 @@ const Profile = () => {
                           name="role"
                           type="text"
                           value={formData.role}
-                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background disabled:cursor-not-allowed disabled:opacity-50"
+                          className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                           disabled
                         />
                       </div>
@@ -589,6 +589,7 @@ const Profile = () => {
                           value={formData.region || ''}
                           onChange={handleChange}
                           className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          disabled
                         >
                           <option value="North India">North India</option>
                           <option value="South India">South India</option>
