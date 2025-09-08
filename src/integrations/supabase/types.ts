@@ -230,6 +230,42 @@ export type Database = {
           }
         ]
       }
+      modules_completed: {
+        Row: {
+          id: string
+          user_id: string
+          module_id: string
+          completion_date: string
+        }
+        Insert: {
+          id?: string
+          user_id: string
+          module_id: string
+          completion_date?: string
+        }
+        Update: {
+          id?: string
+          user_id?: string
+          module_id?: string
+          completion_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "modules_completed_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "modules"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "modules_completed_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       questions: {
         Row: {
           created_at: string | null

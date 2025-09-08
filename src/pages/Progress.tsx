@@ -3,32 +3,45 @@ import { useEffect, useState, useContext } from "react";
 import Header from "@/components/layout/Header";
 import Sidebar from "@/components/layout/Sidebar";
 import { YDCard } from "@/components/ui/YDCard";
-import { BookOpen, BarChart3, PieChart, LucideIcon } from "lucide-react";
+import { BookOpen, BarChart3, PieChart, LucideIcon, Loader2, CheckCircle } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Progress } from "@/components/ui/progress";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, TooltipProps } from 'recharts';
 import { toast } from "@/hooks/use-toast";
 import { LanguageContext } from "@/contexts/LanguageContext";
+import YDButton from "@/components/ui/YDButton";
 
 type ModuleProgress = {
   id: string;
   name: string;
+  order: number;
   total_lessons: number;
   completed_lessons: number;
   percentage: number;
   quiz_score: number | null;
   last_activity: string | null;
+  hasCertificate: boolean;
 };
 
 interface QuizResult {
-  id: string;
-  user_id: string;
   quiz_id: string;
   score: number;
-  passed: boolean;
-  created_at: string;
 }
+
+// Custom Tooltip Component for Chart
+const CustomTooltip = ({ active, payload }: TooltipProps<number, string>) => {
+    if (active && payload && payload.length) {
+        const data = payload[0].payload;
+        return (
+            <div className="p-2 bg-background border rounded shadow-lg text-sm">
+                <p className="font-bold">{data.fullName}</p>
+                <p className="text-green-600">{`Score: ${payload[0].value}%`}</p>
+            </div>
+        );
+    }
+    return null;
+};
 
 const ProgressPage = () => {
   const [modulesProgress, setModulesProgress] = useState<ModuleProgress[]>([]);
@@ -36,6 +49,7 @@ const ProgressPage = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const { user } = useAuth();
   const { currentLanguage } = useContext(LanguageContext)!;
+  const [isClaiming, setIsClaiming] = useState<string | null>(null);
 
   // Translation object structure
   const translations = {
@@ -50,7 +64,10 @@ const ProgressPage = () => {
       quizScore: "Quiz score",
       noModulesAvailable: "No modules available for the selected language.",
       errorLoadingProgress: "Error loading progress data",
-      pleaseRefresh: "Please try refreshing the page"
+      pleaseRefresh: "Please try refreshing the page",
+      getCertificate: "Get Certificate",
+      certificateClaimed: "Certificate Claimed",
+      moduleComplete: "Module Complete!"
     },
     hindi: {
       yourLearningProgress: "आपकी सीखने की प्रगति",
@@ -63,7 +80,10 @@ const ProgressPage = () => {
       quizScore: "क्विज स्कोर",
       noModulesAvailable: "चयनित भाषा के लिए कोई मॉड्यूल उपलब्ध नहीं है।",
       errorLoadingProgress: "प्रगति डेटा लोड करने में त्रुटि",
-      pleaseRefresh: "कृपया पृष्ठ को ताज़ा करने का प्रयास करें"
+      pleaseRefresh: "कृपया पृष्ठ को ताज़ा करने का प्रयास करें",
+      getCertificate: "प्रमाणपत्र प्राप्त करें",
+      certificateClaimed: "प्रमाणपत्र का दावा किया गया",
+      moduleComplete: "मॉड्यूल पूरा हुआ!"
     },
     kannada: {
       yourLearningProgress: "ನಿಮ್ಮ ಕಲಿಕೆಯ ಪ್ರಗತಿ",
@@ -76,197 +96,202 @@ const ProgressPage = () => {
       quizScore: "ರಸಪ್ರಶ್ನೆ ಅಂಕ",
       noModulesAvailable: "ಆಯ್ಕೆಮಾಡಿದ ಭಾಷೆಗಾಗಿ ಯಾವುದೇ ಮಾಡ್ಯೂಲ್‌ಗಳು ಲಭ್ಯವಿಲ್ಲ.",
       errorLoadingProgress: "ಪ್ರಗತಿ ಡೇಟಾವನ್ನು ಲೋಡ್ ಮಾಡುವಲ್ಲಿ ದೋಷ",
-      pleaseRefresh: "ದಯವಿಟ್ಟು ಪುಟವನ್ನು ರಿಫ್ರೆಶ್ ಮಾಡಲು ಪ್ರಯತ್ನಿಸಿ"
+      pleaseRefresh: "ದಯವಿಟ್ಟು ಪುಟವನ್ನು ರಿಫ್ರೆಶ್ ಮಾಡಲು ಪ್ರಯತ್ನಿಸಿ",
+      getCertificate: "ಪ್ರಮಾಣಪತ್ರ ಪಡೆಯಿರಿ",
+      certificateClaimed: "ಪ್ರಮಾಣಪತ್ರವನ್ನು ಕ್ಲೈಮ್ ಮಾಡಲಾಗಿದೆ",
+      moduleComplete: "ಮಾಡ್ಯೂಲ್ ಪೂರ್ಣಗೊಂಡಿದೆ!"
     }
   };
 
   // Get current language translations
   const t = translations[currentLanguage] || translations.english;
+  
+  const handleGetCertificate = async (moduleId: string) => {
+    if (!user) return;
+    setIsClaiming(moduleId);
+    try {
+        const { error } = await supabase
+            .from('modules_completed')
+            .insert({
+                user_id: user.id,
+                module_id: moduleId
+            });
+
+        if (error) {
+            if (error.code === '23505') { // Unique constraint violation
+                toast({
+                    title: "Certificate Exists!",
+                    description: "You have already claimed this certificate."
+                });
+            } else {
+                throw error;
+            }
+        } else {
+            toast({
+                title: "Certificate Ready!",
+                description: "Your certificate is now available on the Certificates page."
+            });
+        }
+
+        // Update local state to reflect the change
+        setModulesProgress(prev =>
+            prev.map(mod =>
+                mod.id === moduleId ? { ...mod, hasCertificate: true } : mod
+            )
+        );
+
+    } catch (error) {
+        console.error("Error claiming certificate:", error);
+        toast({
+            variant: "destructive",
+            title: "Error",
+            description: "Could not claim certificate. Please try again."
+        });
+    } finally {
+        setIsClaiming(null);
+    }
+  };
 
   useEffect(() => {
     const fetchProgress = async () => {
-      if (!user) {
-        setIsLoading(false);
-        setModulesProgress([]);
-        setOverallProgress(0);
-        return;
-      }
-      
-      try {
-        setIsLoading(true);
-        
-        const { data: modulesData, error: modulesError } = await supabase
-          .from('modules')
-          .select('id, name, order, description')
-          .eq('language', currentLanguage)
-          .order('order');
-
-        if (modulesError) throw modulesError;
-        
-        const validModulesData = modulesData || [];
-
-        if (validModulesData.length === 0) {
+        if (!user) {
+            setIsLoading(false);
             setModulesProgress([]);
             setOverallProgress(0);
-            setIsLoading(false);
             return;
         }
 
-        const moduleProgressPromises = validModulesData.map(async (module) => {
-          const { data: lessonsData, error: lessonsError } = await supabase
-            .from('lessons')
-            .select('id')
-            .eq('module_id', module.id)
-            .eq('language', currentLanguage);
+        try {
+            setIsLoading(true);
+
+            // Fetch modules and their lessons for the current language
+            const { data: modulesData, error: modulesError } = await supabase
+                .from('modules')
+                .select('id, name, order, description, lessons(id, quizzes(id))')
+                .eq('language', currentLanguage)
+                .order('order');
+
+            if (modulesError) throw modulesError;
+            if (!modulesData || modulesData.length === 0) {
+                setModulesProgress([]);
+                setOverallProgress(0);
+                setIsLoading(false);
+                return;
+            }
             
-          if (lessonsError) throw lessonsError;
-          
-          const totalLessons = lessonsData ? lessonsData.length : 0;
-          const lessonIds = lessonsData ? lessonsData.map(l => l.id) : [];
-          
-          let completedLessons = 0;
-          let lastActivity = null;
-          
-          if (lessonIds.length > 0) {
+            // Fetch all of the user's completed lessons at once
             const { data: progressData, error: progressError } = await supabase
-              .from('user_progress')
-              .select('lesson_id, status, completed_at')
-              .eq('user_id', user.id)
-              .in('lesson_id', lessonIds)
-              .eq('status', 'completed');
-              
+                .from('user_progress')
+                .select('lesson_id, completed_at')
+                .eq('user_id', user.id)
+                .eq('status', 'completed');
+            
             if (progressError) throw progressError;
-            
-            completedLessons = progressData ? progressData.length : 0;
-            
-            if (progressData && progressData.length > 0) {
-              progressData.sort((a, b) => {
-                if (!a.completed_at) return 1;
-                if (!b.completed_at) return -1;
-                return new Date(b.completed_at).getTime() - new Date(a.completed_at).getTime();
-              });
-              lastActivity = progressData[0].completed_at;
-            }
-          }
-          
-          const percentage = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+            const completedLessonIds = new Set(progressData.map(p => p.lesson_id));
 
-          let quizScore = null;
-          const { data: lessonsWithQuizzes, error: lessonsWithQuizzesError } = await supabase
-            .from('lessons')
-            .select('id, quizzes(id)')
-            .eq('module_id', module.id)
-            .eq('language', currentLanguage)
-            .not('quizzes', 'is', null);
+            // Fetch all claimed certificates at once
+            const { data: completedModulesData, error: completedModulesError } = await supabase
+                .from('modules_completed')
+                .select('module_id')
+                .eq('user_id', user.id);
 
-          if (!lessonsWithQuizzesError && lessonsWithQuizzes && lessonsWithQuizzes.length > 0) {
-            const quizIds = lessonsWithQuizzes
-              .filter(l => l.quizzes && Array.isArray(l.quizzes) && l.quizzes.length > 0)
-              .map(l => (Array.isArray(l.quizzes) ? l.quizzes[0].id : null))
-              .filter(Boolean) as string[];
-            
-            if (quizIds.length > 0) {
-              try {
-                const { data: rpcData, error: rpcError } = await supabase.functions.invoke('get-quiz-results', {
-                  body: JSON.stringify({
-                    userId: user.id,
-                    quizIds: quizIds
-                  })
-                });
-                
-                if (rpcError) {
-                  console.error("Error fetching quiz results via RPC:", rpcError);
-                  toast({ variant: 'destructive', title: 'Error', description: `Failed to load quiz scores: ${rpcError.message}` });
-                } else if (rpcData && Array.isArray(rpcData) && rpcData.length > 0) {
-                  const totalScore = rpcData.reduce((sum, result) => sum + (result.score || 0), 0);
-                  quizScore = Math.round(totalScore / rpcData.length);
+            if (completedModulesError) throw completedModulesError;
+            const completedModuleIds = new Set(completedModulesData.map(c => c.module_id));
+
+            // Aggregate all quiz IDs from all modules to fetch scores in one call
+            const allQuizIds = modulesData.flatMap(module =>
+                module.lessons.flatMap(lesson =>
+                    lesson.quizzes.map(quiz => quiz.id)
+                )
+            );
+
+            let quizScoresByQuizId = new Map<string, number>();
+            if (allQuizIds.length > 0) {
+                const { data: resultsData, error: resultsError } = await supabase
+                    .from('quiz_results')
+                    .select('quiz_id, score, created_at')
+                    .eq('user_id', user.id)
+                    .in('quiz_id', allQuizIds)
+                    .order('created_at', { ascending: false });
+
+                if (resultsError) {
+                    console.error("Error fetching quiz results directly:", resultsError);
+                    toast({ variant: 'destructive', title: 'Error', description: 'Could not load quiz scores.' });
+                } else if (resultsData) {
+                    // Process results to get only the latest score for each quiz
+                    resultsData.forEach(result => {
+                        if (!quizScoresByQuizId.has(result.quiz_id)) {
+                            quizScoresByQuizId.set(result.quiz_id, result.score);
+                        }
+                    });
                 }
-              } catch (error) {
-                console.error("Error processing quiz results:", error);
-                 toast({ variant: 'destructive', title: 'Error', description: 'Failed to process quiz results.' });
-              }
             }
-          }
-          
-          return {
-            id: module.id,
-            name: module.name,
-            total_lessons: totalLessons,
-            completed_lessons: completedLessons,
-            percentage,
-            quiz_score: quizScore,
-            last_activity: lastActivity
-          };
-        });
-        
-        const moduleProgressResults = await Promise.all(moduleProgressPromises);
-        setModulesProgress(moduleProgressResults);
-        
-        const totalLessonsAll = moduleProgressResults.reduce((sum, module) => sum + module.total_lessons, 0);
-        const completedLessonsAll = moduleProgressResults.reduce((sum, module) => sum + module.completed_lessons, 0);
-        const overallPercentage = totalLessonsAll > 0 ? Math.round((completedLessonsAll / totalLessonsAll) * 100) : 0;
-        
-        setOverallProgress(overallPercentage);
-      } catch (error) {
-        console.error('Error fetching progress:', error);
-        toast({
-          variant: "destructive",
-          title: t.errorLoadingProgress, // Translated
-          description: t.pleaseRefresh // Translated
-        });
-        setModulesProgress([]);
-        setOverallProgress(0);
-      } finally {
-        setIsLoading(false);
-      }
+            
+            // Now, process each module with all data already fetched
+            const moduleProgressResults = modulesData.map((module) => {
+              console.log(module)
+                const totalLessons = module.lessons.length;
+                const completedLessons = module.lessons.filter(l => completedLessonIds.has(l.id)).length;
+                const percentage = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
+                
+                const quizIdsInModule = module.lessons.flatMap(l => l.quizzes.map(q => q.id));
+                const scoresInModule = quizIdsInModule
+                    .map(quizId => quizScoresByQuizId.get(quizId))
+                    .filter((score): score is number => score !== undefined);
+                
+                let quizScore = null;
+                if (scoresInModule.length > 0) {
+                    const totalScore = scoresInModule.reduce((sum, score) => sum + score, 0);
+                    quizScore = Math.round(totalScore / scoresInModule.length);
+                }
+
+                return {
+                    id: module.id,
+                    name: module.name,
+                    order: module.order,
+                    total_lessons: totalLessons,
+                    completed_lessons: completedLessons,
+                    percentage,
+                    quiz_score: quizScore,
+                    last_activity: null, // This part can be re-added if needed
+                    hasCertificate: completedModuleIds.has(module.id),
+                };
+            });
+
+            setModulesProgress(moduleProgressResults);
+            
+            const totalLessonsAll = moduleProgressResults.reduce((sum, module) => sum + module.total_lessons, 0);
+            const completedLessonsAll = moduleProgressResults.reduce((sum, module) => sum + module.completed_lessons, 0);
+            const overallPercentage = totalLessonsAll > 0 ? Math.round((completedLessonsAll * 100/ totalLessonsAll) ) : 0;
+            
+            setOverallProgress(overallPercentage);
+
+        } catch (error) {
+            console.error('Error fetching progress:', error);
+            toast({
+                variant: "destructive",
+                title: t.errorLoadingProgress,
+                description: t.pleaseRefresh
+            });
+            setModulesProgress([]);
+            setOverallProgress(0);
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     fetchProgress();
-  }, [user, currentLanguage]); // Removed 't' from dependencies
+}, [user, currentLanguage]);
 
-  const completionChartData = modulesProgress.map(module => ({
-    name: module.name.replace(/\s+/g, '\n'),
-    value: module.percentage,
-    fill: '#5553FF'
-  }));
 
   const quizChartData = modulesProgress
     .filter(module => module.quiz_score !== null)
     .map(module => ({
-      name: module.name.replace(/\s+/g, '\n'),
+      label: `M${module.order}`,
+      fullName: module.name,
       value: module.quiz_score || 0,
       fill: '#10B981'
     }));
-
-  const moduleCards = modulesProgress.map(module => {
-    let icon: LucideIcon;
-    let iconColor: string;
-    let progressColor: string;
-    
-    if (module.name.includes('FMCG') || module.name.includes('Fundamentals')) {
-      icon = BookOpen;
-      iconColor = 'text-blue-500';
-      progressColor = 'bg-blue-500';
-    } else if (module.name.includes('Finance') || module.name.includes('Sales')) {
-      icon = BarChart3;
-      iconColor = 'text-green-500';
-      progressColor = 'bg-green-500';
-    } else {
-      icon = PieChart;
-      iconColor = 'text-purple-500';
-      progressColor = 'bg-purple-500';
-    }
-
-    return {
-      title: module.name,
-      percentage: module.percentage,
-      quizScore: module.quiz_score,
-      icon,
-      iconColor,
-      progressColor,
-      lessonsCompleted: `${module.completed_lessons} ${t.lessonsCompleted} ${module.total_lessons} `
-    };
-  });
 
   return (
     <div className="flex h-screen bg-background">
@@ -286,8 +311,8 @@ const ProgressPage = () => {
               </div>
             ) : (
               <>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-                  <YDCard className="overflow-hidden col-span-1 md:col-span-2 lg:col-span-2">
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:col-span-2 gap-4 mb-8">
+                  <YDCard className="overflow-hidden col-span-1">
                     <div className="p-4">
                       <h3 className="font-medium text-base mb-2">{t.overallCourseProgress}</h3>
                       <div className="flex items-center justify-between mb-2">
@@ -302,24 +327,66 @@ const ProgressPage = () => {
                       </div>
                     </div>
                   </YDCard>
-
-                  {modulesProgress.length > 0 ? moduleCards.map((card, index) => (
-                    <YDCard key={index} className="overflow-hidden">
+                  
+                  <YDCard>
                       <div className="p-4">
-                        <h3 className="font-medium text-base mb-2">{card.title}</h3>
-                        <div className="flex items-center justify-between mb-2">
-                          <div className="text-2xl font-bold">{card.percentage}%</div>
-                          <div className={`p-2 rounded-full ${card.iconColor} bg-opacity-10`}>
-                            <card.icon className={`h-5 w-5 ${card.iconColor}`} />
-                          </div>
+                        <div className="flex items-center mb-4">
+                          <PieChart className="h-5 w-5 mr-2 text-green-500" />
+                          <h3 className="font-medium">{t.quizPerformanceByModule}</h3>
                         </div>
-                        <Progress value={card.percentage} className="h-2 mb-2" />
-                        <div className="text-xs text-muted-foreground">
-                          {card.lessonsCompleted}
+                        <div className="h-48">
+                          <ResponsiveContainer width="100%" height="100%">
+                            <BarChart
+                              data={quizChartData}
+                              margin={{ top: 5, right: 20, left: -10, bottom: 5 }}
+                            >
+                              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                              <XAxis dataKey="label" tick={{ fontSize: 10 }}/>
+                              <YAxis domain={[0, 100]} />
+                              <Tooltip content={<CustomTooltip />} />
+                              <Bar dataKey="value" fill="#10B981" barSize={30} radius={[4, 4, 0, 0]} />
+                            </BarChart>
+                          </ResponsiveContainer>
                         </div>
-                        {card.quizScore !== null && (
-                          <div className="text-xs text-muted-foreground mt-1">{t.quizScore}: {card.quizScore}%</div>
-                        )}
+                      </div>
+                  </YDCard>
+                </div>
+                
+                <h3 className="text-xl font-semibold mb-4">{t.moduleCompletionProgress}</h3>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {modulesProgress.length > 0 ? modulesProgress.map((module) => (
+                    <YDCard key={module.id} className="overflow-hidden flex flex-col">
+                      <div className="p-4 flex flex-col h-full">
+                          <h3 className="font-medium text-base mb-4 flex-grow">{module.name}</h3>
+                          
+                          {module.percentage === 100 ? (
+                               <div className="mt-auto text-center">
+                                   <CheckCircle className="h-10 w-10 text-green-500 mx-auto mb-2" />
+                                   <p className="font-semibold text-green-600 mb-4">{t.moduleComplete}</p>
+                                   <YDButton
+                                       onClick={() => handleGetCertificate(module.id)}
+                                       disabled={module.hasCertificate || !!isClaiming}
+                                       className="w-full"
+                                   >
+                                       {isClaiming === module.id ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                                       {module.hasCertificate ? t.certificateClaimed : t.getCertificate}
+                                   </YDButton>
+                               </div>
+                           ) : (
+                              <div className="mt-auto">
+                                  <div className="flex items-center justify-between mb-2">
+                                      <div className="text-2xl font-bold">{module.percentage}%</div>
+                                  </div>
+                                  <Progress value={module.percentage} className="h-2 mb-2" />
+                                  <div className="text-xs text-muted-foreground">
+                                      {module.completed_lessons} of {module.total_lessons} {t.lessonsCompleted}
+                                  </div>
+                                  {module.quiz_score !== null && (
+                                      <div className="text-xs text-muted-foreground mt-1">{t.quizScore}: {module.quiz_score}%</div>
+                                  )}
+                              </div>
+                           )}
                       </div>
                     </YDCard>
                   )) : (
@@ -332,34 +399,6 @@ const ProgressPage = () => {
                      </div>
                    )}
                 </div>
-
-                {modulesProgress.length > 0 && (
-                  <div className="grid grid-cols-1 md:grid-cols-1 gap-4 mb-8">
-                    <YDCard>
-                      <div className="p-4">
-                        <div className="flex items-center mb-4">
-                          <PieChart className="h-5 w-5 mr-2 text-green-500" />
-                          <h3 className="font-medium">{t.quizPerformanceByModule}</h3>
-                        </div>
-                        <div className="h-72">
-                          <ResponsiveContainer width="100%" height="100%">
-                            <BarChart
-                              data={quizChartData}
-                              layout="vertical"
-                              margin={{ top: 20, right: 30, left: 50, bottom: 20 }}
-                            >
-                              <CartesianGrid strokeDasharray="3 3" horizontal={true} vertical={false} />
-                              <XAxis type="number" domain={[0, 100]} />
-                              <YAxis type="category" dataKey="name" />
-                              <Tooltip />
-                              <Bar dataKey="value" fill="#10B981" barSize={30} radius={[0, 4, 4, 0]} />
-                            </BarChart>
-                          </ResponsiveContainer>
-                        </div>
-                      </div>
-                    </YDCard>
-                  </div>
-                )}
               </>
             )}
           </div>
