@@ -126,11 +126,13 @@ const Announcements = () => {
                                 )}
                             </div>
                             {announcement.image_url && (
-                                <img 
-                                    src={announcement.image_url} 
-                                    alt={announcement.name} 
-                                    className="w-full h-64 object-cover" 
-                                />
+                                <div className="w-full bg-slate-100 dark:bg-slate-800" style={{ height: 'auto' }}>
+                                    <img 
+                                        src={announcement.image_url} 
+                                        alt={announcement.name} 
+                                        className="w-full h-auto object-contain" 
+                                    />
+                                </div>
                             )}
                         </YDCard>
                         <div className="p-2"></div>

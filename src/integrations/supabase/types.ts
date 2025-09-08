@@ -474,6 +474,7 @@ export type Database = {
           region: string | null
           psl_id: string | null
           designation: string | null
+          state: string | null
         }
         Insert: {
           created_at?: string | null
@@ -486,6 +487,7 @@ export type Database = {
           region?: string | null
           psl_id?: string | null
           designation?: string | null
+          state?: string | null
         }
         Update: {
           created_at?: string | null
@@ -498,6 +500,7 @@ export type Database = {
           region?: string | null
           psl_id?: string | null
           designation?: string | null
+          state?: string | null
         }
         Relationships: []
       }
@@ -506,16 +509,28 @@ export type Database = {
           email: string
           name: string | null          
           psl_id: string
+          designation: string | null
+          region: string | null
+          state: string | null
+          role: string | null
         }
         Insert: {
           email?: string | null
           name?: string | null          
           psl_id: string
+          designation?: string | null
+          region?: string | null
+          state?: string | null
+          role?: string | null
         }
         Update: {
           email?: string | null
           name?: string | null          
           psl_id: string
+          designation?: string | null
+          region?: string | null
+          state?: string | null
+          role?: string | null
         }
         Relationships: []
       }

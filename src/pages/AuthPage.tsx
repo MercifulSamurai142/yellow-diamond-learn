@@ -86,8 +86,13 @@ const AuthPage = () => {
           <p className="text-yd-lightGray mb-8">Empowering our sales team with knowledge and skills for excellence in FMCG distribution.</p>
           <div className="hidden md:block">
             <img 
+<<<<<<< HEAD
               src="icon.jpeg"
               alt="https://img.freepik.com/free-vector/online-learning-isometric-concept_1284-17947.jpg?w=900&t=st=1712754000~exp=1712754600~hmac=9ab0a7a5c2c741994682fd8d34dfd507986e84b927b6f1235eddc4a28ccc2022" 
+=======
+              src="icon.jpeg" 
+              alt="E-learning illustration" 
+>>>>>>> 8a9ed7bfc88175f11bda8bceabef88ae646a7817
               className="max-w-xs mx-auto rounded-lg shadow-lg"
             />
           </div>
