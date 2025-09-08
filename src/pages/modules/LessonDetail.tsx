@@ -67,10 +67,10 @@ const LessonDetail = () => {
          checkAndAwardAchievements(checkContext).catch(err => console.error("Achievement check failed:", err));
     }
 
-      toast({
-        title: "Lesson completed!",
-        description: "Your progress has been saved.",
-      });
+      // toast({
+      //   title: "Lesson completed!",
+      //   description: "Your progress has been saved.",
+      // });
 
        setTimeout(() => {
            if (hasQuiz) {
@@ -283,7 +283,7 @@ const LessonDetail = () => {
                 </div>
               ) : null}
             <YDCard className="mb-8 p-0 overflow-hidden rounded-none md:rounded-lg">
-              <div className={cn(isMobile ? "p-0" : "p-6")}>
+              <div className="p-0">
                 {lesson.content ? (
                   <div className="prose dark:prose-invert max-w-full">
                     <div dangerouslySetInnerHTML={{ __html: lesson.content }} />
