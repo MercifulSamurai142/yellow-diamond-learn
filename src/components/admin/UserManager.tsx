@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { YDCard } from "@/components/ui/YDCard";
 import YDButton from "@/components/ui/YDButton";
 import { supabase } from "@/integrations/supabase/client";
@@ -6,23 +6,65 @@ import { toast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Pencil, Save, User, Search } from "lucide-react";
-import { UserProfile } from "@/pages/Admin";
+import { Pencil, Save, User, Search, X } from "lucide-react";
+import { UserProfile, StagedUser } from "@/pages/Admin";
 
 interface UserManagerProps {
   users: UserProfile[];
+  stagedUsers: StagedUser[];
   onUsersUpdate: (users: UserProfile[]) => void;
   refreshData: () => Promise<void>;
 }
 
-const UserManager = ({ users, onUsersUpdate, refreshData }: UserManagerProps) => {
+const REGION_OPTIONS = ["North", "South", "East", "West", "Central"];
+
+const UserManager = ({ users, stagedUsers, onUsersUpdate, refreshData }: UserManagerProps) => {
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
-  const [editUserData, setEditUserData] = useState<{name: string, role: string, designation: string}>({
+  const [editUserData, setEditUserData] = useState({
     name: '',
     role: 'learner',
-    designation: ''
+    designation: '',
+    region: '',
+    state: ''
   });
   const [searchTerm, setSearchTerm] = useState('');
+  const [filter, setFilter] = useState<'all' | 'onboarded' | 'not onboarded'>('all');
+
+  const combinedAndFilteredUsers = useMemo(() => {
+    const onboardedEmails = new Set(users.map(u => u.email));
+
+    const onboarded = users.map(u => ({ ...u, status: 'onboarded' as const }));
+
+    const notOnboarded = stagedUsers
+      .filter(su => su.email && !onboardedEmails.has(su.email))
+      .map(su => ({
+        ...su,
+        id: su.email!,
+        status: 'not onboarded' as const,
+        role: su.role || 'learner',
+        profile_picture: null
+      }));
+
+    let combined: (typeof onboarded[number] | typeof notOnboarded[number])[] = [];
+
+    if (filter === 'all') {
+        combined = [...onboarded, ...notOnboarded];
+    } else if (filter === 'onboarded') {
+        combined = onboarded;
+    } else {
+        combined = notOnboarded;
+    }
+
+    if (!searchTerm) return combined;
+
+    const lowerSearch = searchTerm.toLowerCase();
+    return combined.filter(u => 
+        (u.name && u.name.toLowerCase().includes(lowerSearch)) ||
+        (u.email && u.email.toLowerCase().includes(lowerSearch)) ||
+        (u.role && u.role.toLowerCase().includes(lowerSearch)) ||
+        (u.designation && u.designation.toLowerCase().includes(lowerSearch))
+    );
+  }, [users, stagedUsers, filter, searchTerm]);
 
   const handleEditUser = (userId: string) => {
     const user = users.find(u => u.id === userId);
@@ -32,8 +74,14 @@ const UserManager = ({ users, onUsersUpdate, refreshData }: UserManagerProps) =>
     setEditUserData({
       name: user.name || '',
       role: user.role,
-      designation: user.designation || ''
+      designation: user.designation || '',
+      region: user.region || '',
+      state: user.state || ''
     });
+  };
+
+  const handleCancelEdit = () => {
+    setEditingUserId(null);
   };
 
   const handleSaveUser = async (userId: string) => {
@@ -43,7 +91,9 @@ const UserManager = ({ users, onUsersUpdate, refreshData }: UserManagerProps) =>
         .update({
           name: editUserData.name,
           role: editUserData.role,
-          designation: editUserData.designation
+          designation: editUserData.designation,
+          region: editUserData.region,
+          state: editUserData.state,
         })
         .eq("id", userId);
 
@@ -59,9 +109,7 @@ const UserManager = ({ users, onUsersUpdate, refreshData }: UserManagerProps) =>
         if (user.id === userId) {
           return {
             ...user,
-            name: editUserData.name,
-            role: editUserData.role,
-            designation: editUserData.designation
+            ...editUserData
           };
         }
         return user;
@@ -81,20 +129,22 @@ const UserManager = ({ users, onUsersUpdate, refreshData }: UserManagerProps) =>
     }
   };
 
-  const filteredUsers = users.filter(user => {
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      user.name?.toLowerCase().includes(searchLower) ||
-      user.email.toLowerCase().includes(searchLower) ||
-      user.role.toLowerCase().includes(searchLower) ||
-      user.designation?.toLowerCase().includes(searchLower)
-    );
-  });
-
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
-        <h3 className="text-xl font-medium">Users</h3>
+        <div className="flex items-center gap-4">
+          <h3 className="text-xl font-medium">Users</h3>
+          <Select value={filter} onValueChange={(value) => setFilter(value as any)}>
+              <SelectTrigger className="w-[180px]">
+                  <SelectValue placeholder="Filter by status" />
+              </SelectTrigger>
+              <SelectContent>
+                  <SelectItem value="all">All Users</SelectItem>
+                  <SelectItem value="onboarded">Onboarded</SelectItem>
+                  <SelectItem value="not onboarded">Not Onboarded</SelectItem>
+              </SelectContent>
+          </Select>
+        </div>
         <div className="relative w-64">
           <Input
             placeholder="Search users..."
@@ -107,18 +157,18 @@ const UserManager = ({ users, onUsersUpdate, refreshData }: UserManagerProps) =>
       </div>
 
       <div className="space-y-4">
-        {filteredUsers.length === 0 ? (
+        {combinedAndFilteredUsers.length === 0 ? (
           <YDCard>
             <div className="p-6 text-center">
               <p className="text-muted-foreground">No users found matching your search criteria.</p>
             </div>
           </YDCard>
         ) : (
-          filteredUsers.map((user) => (
+          combinedAndFilteredUsers.map((user) => (
             <YDCard key={user.id} className="p-4">
               <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-4">
-                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary">
+                <div className="flex items-center space-x-4 w-full">
+                  <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary flex-shrink-0">
                     {user.profile_picture ? (
                       <img
                         src={user.profile_picture}
@@ -130,33 +180,51 @@ const UserManager = ({ users, onUsersUpdate, refreshData }: UserManagerProps) =>
                     )}
                   </div>
                   
-                  <div>
-                    {editingUserId === user.id ? (
-                      <div className="flex items-center gap-4">
-                        <Input
-                          value={editUserData.name}
-                          onChange={(e) => setEditUserData({ ...editUserData, name: e.target.value })}
-                          placeholder="User name"
-                          className="w-48"
-                        />
-                        <Input
-                          value={editUserData.designation}
-                          onChange={(e) => setEditUserData({ ...editUserData, designation: e.target.value })}
-                          placeholder="Designation"
-                          className="w-48"
-                        />
-                        <Select
-                          value={editUserData.role}
-                          onValueChange={(value) => setEditUserData({ ...editUserData, role: value })}
-                        >
-                          <SelectTrigger className="w-32">
-                            <SelectValue placeholder="Select role" />
-                          </SelectTrigger>
-                          <SelectContent>
-                            <SelectItem value="learner">Learner</SelectItem>
-                            <SelectItem value="admin">Admin</SelectItem>
-                          </SelectContent>
-                        </Select>
+                  <div className="flex-grow">
+                    {editingUserId === user.id && user.status === 'onboarded' ? (
+                      <div className="space-y-2">
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                          <Input
+                            value={editUserData.name}
+                            onChange={(e) => setEditUserData({ ...editUserData, name: e.target.value })}
+                            placeholder="User name"
+                          />
+                          <Input
+                            value={editUserData.designation}
+                            onChange={(e) => setEditUserData({ ...editUserData, designation: e.target.value })}
+                            placeholder="Designation"
+                          />
+                          <Select
+                            value={editUserData.role}
+                            onValueChange={(value) => setEditUserData({ ...editUserData, role: value })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select role" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="learner">Learner</SelectItem>
+                              <SelectItem value="admin">Admin</SelectItem>
+                            </SelectContent>
+                          </Select>
+                          <Input
+                            value={editUserData.state}
+                            onChange={(e) => setEditUserData({ ...editUserData, state: e.target.value })}
+                            placeholder="State"
+                          />
+                          <Select
+                            value={editUserData.region}
+                            onValueChange={(value) => setEditUserData({ ...editUserData, region: value })}
+                          >
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select region" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              {REGION_OPTIONS.map(region => (
+                                  <SelectItem key={region} value={region}>{region}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
                       </div>
                     ) : (
                       <>
@@ -168,6 +236,11 @@ const UserManager = ({ users, onUsersUpdate, refreshData }: UserManagerProps) =>
                             }`}>
                               {user.role}
                             </span>
+                            <span className={`capitalize text-xs px-2 py-1 rounded-full ${
+                              user.status === 'onboarded' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
+                            }`}>
+                                {user.status}
+                            </span>
                            {user.designation && <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800">{user.designation}</span>}
                         </div>
                       </>
@@ -175,20 +248,30 @@ const UserManager = ({ users, onUsersUpdate, refreshData }: UserManagerProps) =>
                   </div>
                 </div>
                 
-                <div>
-                  {editingUserId === user.id ? (
-                    <YDButton
-                      variant="default"
-                      size="sm"
-                      onClick={() => handleSaveUser(user.id)}
-                    >
-                      <Save size={16} className="mr-1" /> Save
-                    </YDButton>
+                <div className="flex gap-2">
+                  {editingUserId === user.id && user.status === 'onboarded' ? (
+                    <>
+                      <YDButton
+                        variant="default"
+                        size="sm"
+                        onClick={() => handleSaveUser(user.id)}
+                      >
+                        <Save size={16} className="mr-1" /> Save
+                      </YDButton>
+                      <YDButton
+                        variant="outline"
+                        size="sm"
+                        onClick={handleCancelEdit}
+                      >
+                        <X size={16} className="mr-1" /> Cancel
+                      </YDButton>
+                    </>
                   ) : (
                     <YDButton
                       variant="outline"
                       size="sm"
-                      onClick={() => handleEditUser(user.id)}
+                      onClick={() => user.status === 'onboarded' && handleEditUser(user.id)}
+                      disabled={user.status !== 'onboarded'}
                     >
                       <Pencil size={16} className="mr-1" /> Edit
                     </YDButton>

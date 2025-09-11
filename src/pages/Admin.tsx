@@ -21,6 +21,7 @@ export type Question = Tables<"questions">;
 export type Answer = Tables<"answers">;
 export type Announcement = Tables<"announcements">;
 export type UserProfile = Tables<"users">;
+export type StagedUser = Tables<"user_import_staging">;
 export type ModuleDesignation = Tables<"module_designation">;
 export type ModuleRegion = Tables<"module_region">;
 
@@ -33,6 +34,7 @@ const Admin = () => {
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
   const [users, setUsers] = useState<UserProfile[]>([]);
+  const [stagedUsers, setStagedUsers] = useState<StagedUser[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [moduleDesignations, setModuleDesignations] = useState<ModuleDesignation[]>([]);
   const [moduleRegions, setModuleRegions] = useState<ModuleRegion[]>([]);
@@ -60,6 +62,10 @@ const Admin = () => {
       const { data: usersData, error: usersError } = await supabase.from("users").select("*");
       if (usersError) throw usersError;
       setUsers(usersData || []);
+
+      const { data: stagedUsersData, error: stagedUsersError } = await supabase.from("user_import_staging").select("*");
+      if (stagedUsersError) throw stagedUsersError;
+      setStagedUsers(stagedUsersData || []);
       
       const { data: announcementsData, error: announcementsError } = await supabase.from("announcements").select("*").order("created_at", { ascending: false });
       if (announcementsError) throw announcementsError;
@@ -140,6 +146,7 @@ const Admin = () => {
                 <TabsContent value="users" className="space-y-4">
                   <UserManager 
                     users={users} 
+                    stagedUsers={stagedUsers}
                     onUsersUpdate={setUsers} 
                     refreshData={loadData} 
                   />
