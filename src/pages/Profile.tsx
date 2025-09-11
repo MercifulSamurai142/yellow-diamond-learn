@@ -634,7 +634,6 @@ const Profile = () => {
                     </div>
                   </form>
                 </YDCard>
-
                 <YDCard className="mt-6 p-6">
                   <h3 className="font-semibold mb-6">{t.password}</h3>
                   <form className="space-y-4" onSubmit={(e) => { e.preventDefault(); handleChangePassword(); }}>
