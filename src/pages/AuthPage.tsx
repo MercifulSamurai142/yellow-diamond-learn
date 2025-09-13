@@ -85,7 +85,7 @@ const AuthPage = () => {
           <h2 className="text-2xl md:text-4xl font-bold text-white mb-4">Learning Management System</h2>
           <p className="text-yd-lightGray mb-8">Empowering our sales team with knowledge and skills for excellence in FMCG distribution.</p>
           <div className="hidden md:block">
-            <img 
+            <img
               src="https://www.yellowdiamond.in/wp-content/uploads/2024/06/YD-logo@2x.png" 
               alt="E-learning illustration" 
               className="max-w-xs mx-auto"
