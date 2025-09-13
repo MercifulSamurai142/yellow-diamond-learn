@@ -16,19 +16,22 @@ const translations = {
     back: "Back to Announcements",
     notFound: "Announcement Not Found",
     notFoundDesc: "The announcement you are looking for does not exist.",
-    download: "Download Attachment"
+    download: "Download Attachment",
+    downloading: "Downloading..."
   },
   hindi: {
     back: "घोषणाओं पर वापस जाएं",
     notFound: "घोषणा नहीं मिली",
     notFoundDesc: "आप जिस घोषणा की तलाश कर रहे हैं वह मौजूद नहीं है।",
-    download: "अटैचमेंट डाउनलोड करें"
+    download: "अटैचमेंट डाउनलोड करें",
+    downloading: "डाउनलोड हो रहा है..."
   },
   kannada: {
     back: "ಪ್ರಕಟಣೆಗಳಿಗೆ ಹಿಂತಿರುಗಿ",
     notFound: "ಪ್ರಕಟಣೆ ಕಂಡುಬಂದಿಲ್ಲ",
     notFoundDesc: "ನೀವು ಹುಡುಕುತ್ತಿರುವ ಪ್ರಕಟಣೆ ಅಸ್ತಿತ್ವದಲ್ಲಿಲ್ಲ.",
-    download: "ಲಗತ್ತನ್ನು ಡೌನ್‌ಲೋಡ್ ಮಾಡಿ"
+    download: "ಲಗತ್ತನ್ನು ಡೌನ್‌ಲೋಡ್ ಮಾಡಿ",
+    downloading: "ಡೌನ್‌ಲೋಡ್ ಮಾಡಲಾಗುತ್ತಿದೆ..."
   }
 };
 
@@ -36,6 +39,7 @@ const AnnouncementDetail = () => {
   const { announcementId } = useParams<{ announcementId: string }>();
   const [announcement, setAnnouncement] = useState<Announcement | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isDownloading, setIsDownloading] = useState(false);
   const { currentLanguage } = useContext(LanguageContext)!;
 
   const t = translations[currentLanguage] || translations.english;
@@ -77,6 +81,52 @@ const AnnouncementDetail = () => {
 
     fetchAnnouncement();
   }, [announcementId]);
+
+  const handleDownload = async (url: string) => {
+    if (!url) return;
+    setIsDownloading(true);
+    try {
+        const urlParts = url.split('/announcement-files/');
+        if (urlParts.length < 2) {
+            throw new Error("Invalid announcement file URL format.");
+        }
+        const filePath = urlParts[1];
+        const fileName = filePath.split('/').pop() || 'download';
+
+        const { data, error } = await supabase.storage
+            .from('announcement-files')
+            .download(filePath);
+
+        if (error) throw error;
+        if (!data) throw new Error("No file data received.");
+
+        const blob = new Blob([data], { type: data.type });
+        const blobUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.setAttribute('download', fileName);
+        document.body.appendChild(link);
+        link.click();
+
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(blobUrl);
+
+        toast({
+            title: "Download Started",
+            description: `Downloading ${fileName}.`
+        });
+
+    } catch (error: any) {
+        console.error("Download error:", error);
+        toast({
+            variant: "destructive",
+            title: "Download Failed",
+            description: error.message || "Could not download the attachment."
+        });
+    } finally {
+        setIsDownloading(false);
+    }
+};
 
   if (isLoading) {
     return (
@@ -130,15 +180,18 @@ const AnnouncementDetail = () => {
                     )}
                     {announcement.url && (
                         <div className="mt-6 pt-4 border-t">
-                            <a 
-                                href={announcement.url} 
-                                target="_blank" 
-                                rel="noopener noreferrer" 
-                                className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline"
-                            >
-                                <Download size={16} />
-                                {t.download}
-                            </a>
+                            <button
+                                onClick={() => handleDownload(announcement.url!)}
+                                disabled={isDownloading}
+                                className="inline-flex items-center gap-2 text-sm font-medium text-primary hover:underline disabled:opacity-50 disabled:cursor-not-allowed"
+                              >
+                                {isDownloading ? (
+                                    <Loader2 size={16} className="animate-spin" />
+                                ) : (
+                                    <Download size={16} />
+                                )}
+                                <span>{isDownloading ? t.downloading : t.download}</span>
+                            </button>
                         </div>
                     )}
                     </div>

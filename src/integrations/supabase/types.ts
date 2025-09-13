@@ -46,6 +46,7 @@ export type Database = {
           image_url : string | null
           created_at: string | null
           updated_at: string | null
+          expire_at: string | null
         }
         Insert: {
           id?: string
@@ -56,6 +57,7 @@ export type Database = {
           image_url?: string | null
           created_at?: string | null
           updated_at?: string | null
+          expire_at?: string | null
         }
         Update: {
           id?: string
@@ -66,6 +68,7 @@ export type Database = {
           image_url?: string | null
           created_at?: string | null
           updated_at?: string | null
+          expire_at?: string | null
         }
         Relationships: []
       }
