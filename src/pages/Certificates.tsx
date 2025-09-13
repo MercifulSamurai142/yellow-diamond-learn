@@ -108,18 +108,19 @@ const CertificatesPage = () => {
         .select(`
           module_id,
           completion_date,
-          modules (
+          modules!inner (
             name,
             description
           )
         `)
         .eq('user_id', user.id)
+        .eq('modules.language', currentLanguage)
         .order('completion_date', { ascending: false });
 
       if (error) throw error;
       
       const validData = data?.filter(c => c.modules) || [];
-      setCertificates(validData);
+      setCertificates(validData as CompletedModule[]);
 
     } catch (error) {
       console.error("Error fetching certificates:", error);
@@ -137,7 +138,7 @@ const CertificatesPage = () => {
     if(!isAuthLoading) {
         fetchCompletedModules();
     }
-  }, [user, isAuthLoading]);
+  }, [user, isAuthLoading, currentLanguage]);
 
   const handleRefreshCertificates = async () => {
     if (!user) return;
