@@ -16,8 +16,9 @@ import AnnouncementDetail from "./pages/modules/AnnouncementDetail";
 import CertificatesPage from "./pages/Certificates";
 import Progress from "./pages/Progress";
 import Admin from "./pages/Admin";
+import UserListPage from "./pages/UserListPage";
 import NotFound from "./pages/NotFound";
-import ResetPasswordPage from "./pages/ResetPasswordPage"; // Import the new component
+import ResetPasswordPage from "./pages/ResetPasswordPage";
 import { AuthProvider } from "./contexts/AuthContext";
 import {ProgressProvider} from "./contexts/ProgressContext"
 import { LanguageProvider } from "./contexts/LanguageContext";
@@ -108,6 +109,11 @@ const App = () => (
                 <Route path="/admin" element={
                   <ProtectedRoute requiredRole="admin">
                     <Admin />
+                  </ProtectedRoute>
+                } />
+                <Route path="/admin/users" element={
+                  <ProtectedRoute requiredRole="admin">
+                    <UserListPage />
                   </ProtectedRoute>
                 } />
 

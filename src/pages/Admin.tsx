@@ -9,7 +9,6 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import ModuleManager from "@/components/admin/ModuleManager";
 import LessonManager from "@/components/admin/LessonManager";
 import QuizManager from "@/components/admin/QuizManager";
-import UserManager from "@/components/admin/UserManager";
 import AnnouncementManager from "@/components/admin/AnnouncementManager";
 import { Tables } from "@/integrations/supabase/types";
 import { useAuth } from "@/contexts/AuthContext";
@@ -33,14 +32,11 @@ const Admin = () => {
   const [modules, setModules] = useState<Module[]>([]);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [quizzes, setQuizzes] = useState<Quiz[]>([]);
-  const [users, setUsers] = useState<UserProfile[]>([]);
-  const [stagedUsers, setStagedUsers] = useState<StagedUser[]>([]);
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [moduleDesignations, setModuleDesignations] = useState<ModuleDesignation[]>([]);
   const [moduleRegions, setModuleRegions] = useState<ModuleRegion[]>([]);
 
   useEffect(() => {
-    console.log('Current Auth User Object:', authUser);
     loadData();
   }, [authUser]);
 
@@ -59,14 +55,6 @@ const Admin = () => {
       if (quizzesError) throw quizzesError;
       setQuizzes(quizzesData || []);
 
-      const { data: usersData, error: usersError } = await supabase.from("users").select("*");
-      if (usersError) throw usersError;
-      setUsers(usersData || []);
-
-      const { data: stagedUsersData, error: stagedUsersError } = await supabase.from("user_import_staging").select("*");
-      if (stagedUsersError) throw stagedUsersError;
-      setStagedUsers(stagedUsersData || []);
-      
       const { data: announcementsData, error: announcementsError } = await supabase.from("announcements").select("*").order("created_at", { ascending: false });
       if (announcementsError) throw announcementsError;
       setAnnouncements(announcementsData || []);
@@ -107,11 +95,10 @@ const Admin = () => {
               </div>
               
               <Tabs defaultValue="modules" onValueChange={setActiveTab}>
-                <TabsList className="mb-6 w-full grid grid-cols-5">
+                <TabsList className="mb-6 w-full grid grid-cols-4">
                   <TabsTrigger value="modules">Modules</TabsTrigger>
                   <TabsTrigger value="lessons">Lessons</TabsTrigger>
                   <TabsTrigger value="quizzes">Quizzes</TabsTrigger>
-                  <TabsTrigger value="users">Users</TabsTrigger>
                   <TabsTrigger value="announcements">Announcements</TabsTrigger>
                 </TabsList>
                 
@@ -139,15 +126,6 @@ const Admin = () => {
                     quizzes={quizzes} 
                     lessons={lessons} 
                     onQuizzesUpdate={setQuizzes} 
-                    refreshData={loadData} 
-                  />
-                </TabsContent>
-                
-                <TabsContent value="users" className="space-y-4">
-                  <UserManager 
-                    users={users} 
-                    stagedUsers={stagedUsers}
-                    onUsersUpdate={setUsers} 
                     refreshData={loadData} 
                   />
                 </TabsContent>
