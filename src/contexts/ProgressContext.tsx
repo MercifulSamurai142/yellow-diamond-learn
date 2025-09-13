@@ -4,6 +4,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { LanguageContext } from './LanguageContext'; // Import LanguageContext
+import { useProfile } from '@/hooks/useProfile';
 
 // Define the shape of the progress stats
 interface ProgressStats {
@@ -39,13 +40,14 @@ const ProgressContext = createContext<ProgressContextType>({
 // Create the provider component
 export const ProgressProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { user } = useAuth();
+  const { profile, isLoading: isProfileLoading } = useProfile();
   const { currentLanguage } = useContext(LanguageContext)!; // Get currentLanguage
   const [progressStats, setProgressStats] = useState<ProgressStats>(defaultProgressStats);
   const [isLoading, setIsLoading] = useState(true);
 
   const fetchProgressData = async () => {
-    if (!user) {
-        // If no user, reset to default and stop loading
+    if (!user || !profile || isProfileLoading) {
+        // If no user or profile, reset to default and stop loading
         setProgressStats(defaultProgressStats);
         setIsLoading(false);
         return;
@@ -61,22 +63,69 @@ export const ProgressProvider: React.FC<{ children: ReactNode }> = ({ children }
 
       if (modulesError) throw modulesError;
       if (!modulesData) throw new Error("No modules found");
+      
+      let filteredModules = modulesData;
+
+      if (profile.role !== 'admin') {
+          const moduleIds = modulesData.map(m => m.id);
+          if(moduleIds.length === 0) {
+              filteredModules = [];
+          } else {
+              const { data: moduleDesignations, error: desError } = await supabase.from('module_designation').select('module_id, designation').in('module_id', moduleIds);
+              if (desError) throw desError;
+              const designationsMap = new Map<string, string[]>();
+              for (const md of moduleDesignations) {
+                  if (!designationsMap.has(md.module_id)) designationsMap.set(md.module_id, []);
+                  designationsMap.get(md.module_id)!.push(md.designation);
+              }
+
+              const { data: moduleRegions, error: regError } = await supabase.from('module_region').select('module_id, region').in('module_id', moduleIds);
+              if (regError) throw regError;
+              const regionsMap = new Map<string, string[]>();
+              for (const mr of moduleRegions) {
+                  if (!regionsMap.has(mr.module_id)) regionsMap.set(mr.module_id, []);
+                  regionsMap.get(mr.module_id)!.push(mr.region);
+              }
+
+              const userDesignation = profile.designation;
+              const userRegion = profile.region;
+
+              filteredModules = modulesData.filter(module => {
+                  const designations = designationsMap.get(module.id) || [];
+                  const regions = regionsMap.get(module.id) || [];
+                  const isDesignationRestricted = designations.length > 0;
+                  const isRegionRestricted = regions.length > 0;
+
+                  if (!isDesignationRestricted && !isRegionRestricted) {
+                      return false;
+                  }
+
+                  const userMatchesDesignation = !isDesignationRestricted || (!!userDesignation && designations.includes(userDesignation));
+                  const userMatchesRegion = !isRegionRestricted || (!!userRegion && regions.includes(userRegion));
+
+                  return userMatchesDesignation && userMatchesRegion;
+              });
+          }
+      }
+
+      const filteredModuleIds = filteredModules.map(m => m.id);
+
+      if (filteredModuleIds.length === 0) {
+          setProgressStats({ ...defaultProgressStats, totalModules: 0 });
+          setIsLoading(false);
+          return;
+      }
 
       // Fetch all lessons for progress calculation, also filtered by language
       const { data: allLessonsData, error: allLessonsError } = await supabase
         .from('lessons')
         .select('id, module_id')
-        .eq('language', currentLanguage); // Filter by language
+        .in('module_id', filteredModuleIds);
 
       if (allLessonsError) throw allLessonsError;
       if (!allLessonsData) throw new Error("No lessons found");
 
       // Fetch all completed progress items for the user
-      // user_progress itself does not have a language column, it's linked to lesson_id.
-      // So, completedLessonIds will be for lessons the user has completed regardless of language.
-      // However, when calculating against `totalLessonsCount` and `completedModulesCount`,
-      // we're already filtering `allLessonsData` and `modulesData` by language,
-      // ensuring consistency with the displayed content.
        const { data: allUserProgressData, error: allUserProgressError } = await supabase
            .from('user_progress')
            .select('lesson_id')
@@ -89,7 +138,6 @@ export const ProgressProvider: React.FC<{ children: ReactNode }> = ({ children }
 
        // Calculate overall module progress percentage based on filtered lessons
        const totalLessonsCount = allLessonsData.length;
-       // Only count lessons completed that are also in the `allLessonsData` (i.e., current language)
        const completedLessonsCount = allLessonsData.filter(lesson => completedLessonIds.has(lesson.id)).length;
        const overallProgressPercentage = totalLessonsCount > 0
            ? Math.round((completedLessonsCount / totalLessonsCount) * 100)
@@ -97,7 +145,7 @@ export const ProgressProvider: React.FC<{ children: ReactNode }> = ({ children }
 
        // Calculate completed modules count based on filtered modules and lessons
        let completedModulesCount = 0;
-       for (const module of modulesData) {
+       for (const module of filteredModules) {
            const lessonsInModule = allLessonsData.filter(l => l.module_id === module.id);
            const allLessonsInModuleCompleted = lessonsInModule.length > 0 && lessonsInModule.every(l => completedLessonIds.has(l.id));
            if (allLessonsInModuleCompleted) {
@@ -106,29 +154,26 @@ export const ProgressProvider: React.FC<{ children: ReactNode }> = ({ children }
        }
 
       // Fetch achievements (these are generally not language specific)
-      const { data: achievementsData, error: achievementsError } = await supabase
+      const { count: achievementsCount, error: achievementsError } = await supabase
         .from('achievements')
-        .select('id');
+        .select('id', { count: 'exact', head: true });
 
       if (achievementsError) throw achievementsError;
-      if (!achievementsData) throw new Error("No achievements found");
 
       // Fetch unlocked achievements
-      const { data: unlockedAchievementsData, error: unlockedError } = await supabase
+      const { count: unlockedAchievementsCount, error: unlockedError } = await supabase
         .from('user_achievements')
-        .select('achievement_id')
+        .select('achievement_id', { count: 'exact', head: true })
         .eq('user_id', user.id);
 
       if (unlockedError) throw unlockedError;
 
-      const unlockedIds = new Set(unlockedAchievementsData?.map(ua => ua.achievement_id) || []);
-
       setProgressStats({
         moduleProgress: overallProgressPercentage,
         completedModules: completedModulesCount,
-        totalModules: modulesData.length, // total modules for the selected language
-        unlockedAchievements: unlockedIds.size,
-        totalAchievements: achievementsData.length,
+        totalModules: filteredModules.length,
+        unlockedAchievements: unlockedAchievementsCount || 0,
+        totalAchievements: achievementsCount || 0,
       });
 
     } catch (error) {
@@ -147,7 +192,7 @@ export const ProgressProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   useEffect(() => {
     fetchProgressData();
-  }, [user, currentLanguage]); // Refetch when user or currentLanguage changes
+  }, [user, profile, isProfileLoading, currentLanguage]); // Refetch when user, profile or currentLanguage changes
 
   return (
     <ProgressContext.Provider value={{ progressStats, isLoading, refetchProgress: fetchProgressData }}>

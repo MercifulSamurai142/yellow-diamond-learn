@@ -36,7 +36,7 @@ type Achievement = Tables<"achievements"> & {
 
 const Dashboard = () => {
   const { user } = useAuth();
-  const { profile } = useProfile();
+  const { profile, isLoading: isProfileLoading } = useProfile();
   const { progressStats, isLoading: isProgressLoading } = useProgress();
   const [modules, setModules] = useState<ModuleWithProgress[]>([]);
   const [achievements, setAchievements] = useState<Achievement[]>([]); // Achievements list, kept as is.
@@ -103,7 +103,7 @@ const Dashboard = () => {
   const t = translations[currentLanguage] || translations.english;
 
   useEffect(() => {
-    if (!user) {
+    if (!user || !profile || isProfileLoading) {
       setIsListLoading(false);
       return;
     }
@@ -125,6 +125,49 @@ const Dashboard = () => {
           setIsListLoading(false);
           return;
         }
+
+        let finalModules = modulesData;
+
+        if (profile.role !== 'admin') {
+            const { data: moduleDesignations, error: desError } = await supabase.from('module_designation').select('module_id, designation');
+            if (desError) throw desError;
+            const designationsMap = new Map<string, string[]>();
+            for (const md of moduleDesignations) {
+                if (!designationsMap.has(md.module_id)) designationsMap.set(md.module_id, []);
+                designationsMap.get(md.module_id)!.push(md.designation);
+            }
+
+            const { data: moduleRegions, error: regError } = await supabase.from('module_region').select('module_id, region');
+            if (regError) throw regError;
+            const regionsMap = new Map<string, string[]>();
+            for (const mr of moduleRegions) {
+                if (!regionsMap.has(mr.module_id)) regionsMap.set(mr.module_id, []);
+                regionsMap.get(mr.module_id)!.push(mr.region);
+            }
+
+            const userDesignation = profile.designation;
+            const userRegion = profile.region;
+
+            finalModules = modulesData.filter(module => {
+                const designations = designationsMap.get(module.id) || [];
+                const regions = regionsMap.get(module.id) || [];
+
+                const isDesignationRestricted = designations.length > 0;
+                const isRegionRestricted = regions.length > 0;
+
+                // If a module has no restrictions, it is NOT shown.
+                if (!isDesignationRestricted && !isRegionRestricted) {
+                    return false;
+                }
+
+                // If it is restricted, the user must match all active restrictions.
+                const userMatchesDesignation = !isDesignationRestricted || (!!userDesignation && designations.includes(userDesignation));
+                const userMatchesRegion = !isRegionRestricted || (!!userRegion && regions.includes(userRegion));
+
+                return userMatchesDesignation && userMatchesRegion;
+            });
+        }
+
 
         // Fetch all lessons (also filtered by language to match modules)
         const { data: allLessonsData, error: lessonsError } = await supabase
@@ -148,7 +191,7 @@ const Dashboard = () => {
 
 
         // Map modules to include progress and status for display
-        const modulesWithProgress = modulesData.map((module) => {
+        const modulesWithProgress = finalModules.map((module) => {
             const lessonsInModule = (allLessonsData || []).filter(l => l.module_id === module.id);
             const lessonCount = lessonsInModule.length;
             const completedLessonsInModule = lessonsInModule.filter(l => completedLessonIds.has(l.id)).length;
@@ -206,7 +249,7 @@ const Dashboard = () => {
     };
 
     fetchListData();
-  }, [user, currentLanguage, t.errorTitle, t.errorDescription]); // Re-run effect when currentLanguage changes
+  }, [user, profile, isProfileLoading, currentLanguage, t.errorTitle, t.errorDescription]); // Re-run effect when currentLanguage changes
 
   const findContinueModule = () => {
     const inProgressModules = modules.filter(m => m.status === "in-progress");
@@ -223,7 +266,7 @@ const Dashboard = () => {
   };
 
   const continueModule = modules.length > 0 ? findContinueModule() : null;
-  const showOverallLoading = isProgressLoading || isListLoading;
+  const showOverallLoading = isProgressLoading || isListLoading || isProfileLoading;
 
   return (
     <div className="flex h-screen bg-background">

@@ -11,6 +11,7 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { toast } from "@/hooks/use-toast";
 import { LanguageContext } from "@/contexts/LanguageContext";
 import YDButton from "@/components/ui/YDButton";
+import { useProfile } from "@/hooks/useProfile";
 
 type ModuleProgress = {
   id: string;
@@ -48,6 +49,7 @@ const ProgressPage = () => {
   const [overallProgress, setOverallProgress] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const { user } = useAuth();
+  const { profile, isLoading: isProfileLoading } = useProfile();
   const { currentLanguage } = useContext(LanguageContext)!;
   const [isClaiming, setIsClaiming] = useState<string | null>(null);
 
@@ -154,7 +156,7 @@ const ProgressPage = () => {
 
   useEffect(() => {
     const fetchProgress = async () => {
-        if (!user) {
+        if (!user || !profile || isProfileLoading) {
             setIsLoading(false);
             setModulesProgress([]);
             setOverallProgress(0);
@@ -179,6 +181,57 @@ const ProgressPage = () => {
                 return;
             }
             
+            let filteredModules = modulesData;
+
+            if (profile.role !== 'admin') {
+                const moduleIds = modulesData.map(m => m.id);
+                 if(moduleIds.length === 0) {
+                    filteredModules = [];
+                } else {
+                    const { data: moduleDesignations, error: desError } = await supabase.from('module_designation').select('module_id, designation').in('module_id', moduleIds);
+                    if (desError) throw desError;
+                    const designationsMap = new Map<string, string[]>();
+                    for (const md of moduleDesignations) {
+                        if (!designationsMap.has(md.module_id)) designationsMap.set(md.module_id, []);
+                        designationsMap.get(md.module_id)!.push(md.designation);
+                    }
+
+                    const { data: moduleRegions, error: regError } = await supabase.from('module_region').select('module_id, region').in('module_id', moduleIds);
+                    if (regError) throw regError;
+                    const regionsMap = new Map<string, string[]>();
+                    for (const mr of moduleRegions) {
+                        if (!regionsMap.has(mr.module_id)) regionsMap.set(mr.module_id, []);
+                        regionsMap.get(mr.module_id)!.push(mr.region);
+                    }
+
+                    const userDesignation = profile.designation;
+                    const userRegion = profile.region;
+
+                    filteredModules = modulesData.filter(module => {
+                        const designations = designationsMap.get(module.id) || [];
+                        const regions = regionsMap.get(module.id) || [];
+                        const isDesignationRestricted = designations.length > 0;
+                        const isRegionRestricted = regions.length > 0;
+
+                        if (!isDesignationRestricted && !isRegionRestricted) {
+                            return false; 
+                        }
+
+                        const userMatchesDesignation = !isDesignationRestricted || (!!userDesignation && designations.includes(userDesignation));
+                        const userMatchesRegion = !isRegionRestricted || (!!userRegion && regions.includes(userRegion));
+
+                        return userMatchesDesignation && userMatchesRegion;
+                    });
+                }
+            }
+
+            if (filteredModules.length === 0) {
+              setModulesProgress([]);
+              setOverallProgress(0);
+              setIsLoading(false);
+              return;
+            }
+
             // Fetch all of the user's completed lessons at once
             const { data: progressData, error: progressError } = await supabase
                 .from('user_progress')
@@ -199,7 +252,7 @@ const ProgressPage = () => {
             const completedModuleIds = new Set(completedModulesData.map(c => c.module_id));
 
             // Aggregate all quiz IDs from all modules to fetch scores in one call
-            const allQuizIds = modulesData.flatMap(module =>
+            const allQuizIds = filteredModules.flatMap(module =>
                 module.lessons.flatMap(lesson =>
                     lesson.quizzes.map(quiz => quiz.id)
                 )
@@ -228,8 +281,7 @@ const ProgressPage = () => {
             }
             
             // Now, process each module with all data already fetched
-            const moduleProgressResults = modulesData.map((module) => {
-              console.log(module)
+            const moduleProgressResults = filteredModules.map((module) => {
                 const totalLessons = module.lessons.length;
                 const completedLessons = module.lessons.filter(l => completedLessonIds.has(l.id)).length;
                 const percentage = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
@@ -281,7 +333,7 @@ const ProgressPage = () => {
     };
 
     fetchProgress();
-}, [user, currentLanguage]);
+}, [user, profile, isProfileLoading, currentLanguage]);
 
 
   const quizChartData = modulesProgress
