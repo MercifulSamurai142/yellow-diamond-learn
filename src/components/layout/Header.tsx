@@ -4,7 +4,8 @@ import { cn } from "@/lib/utils";
 import { useProfile } from "@/hooks/useProfile";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useContext } from 'react';
-import { LanguageContext } from '@/contexts/LanguageContext';
+import { LanguageContext, Language } from '@/contexts/LanguageContext';
+import { useNavigate } from "react-router-dom";
 // Import DropdownMenu components instead of Select
 import {
   DropdownMenu,
@@ -22,6 +23,14 @@ const Header = ({ className }: HeaderProps) => {
   const { profile } = useProfile();
   const isMobile = useIsMobile();
   const { currentLanguage, setLanguage } = useContext(LanguageContext)!;
+  const navigate = useNavigate();
+
+  const handleLanguageChange = (lang: Language) => {
+    if (lang !== currentLanguage) {
+      setLanguage(lang);
+      navigate('/dashboard');
+    }
+  };
 
   const mobileLeftPaddingClass = isMobile ? "pl-[60px]" : "pl-6";
 
@@ -71,13 +80,13 @@ const Header = ({ className }: HeaderProps) => {
             </Button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => setLanguage('english')}>
+            <DropdownMenuItem onClick={() => handleLanguageChange('english')}>
               English
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setLanguage('hindi')}>
+            <DropdownMenuItem onClick={() => handleLanguageChange('hindi')}>
               हिन्दी (Hindi)
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => setLanguage('kannada')}>
+            <DropdownMenuItem onClick={() => handleLanguageChange('kannada')}>
               ಕನ್ನಡ (Kannada)
             </DropdownMenuItem>
           </DropdownMenuContent>

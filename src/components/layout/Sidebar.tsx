@@ -11,7 +11,8 @@ import {
   Menu,
   X,
   LogOut,
-  Megaphone
+  Megaphone,
+  Users
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -45,7 +46,8 @@ const Sidebar = ({ className }: SidebarProps) => {
       profile: "Profile",
       settings: "Settings",
       admin: "Admin",
-      logout: "Logout"
+      logout: "Logout",
+      userList: "User List"
     },
     hindi: {
       companyName: "यलो डायमंड",
@@ -57,7 +59,8 @@ const Sidebar = ({ className }: SidebarProps) => {
       profile: "प्रोफाइल",
       settings: "सेटिंग्स",
       admin: "एडमिन",
-      logout: "लॉग आउट"
+      logout: "लॉग आउट",
+      userList: "उपयोगकर्ता सूची"
     },
     kannada: {
       companyName: "ಯೆಲ್ಲೊ ಡೈಮಂಡ್",
@@ -69,7 +72,8 @@ const Sidebar = ({ className }: SidebarProps) => {
       profile: "ಪ್ರೊಫೈಲ್",
       settings: "ಸೆಟ್ಟಿಂಗ್‌ಗಳು",
       admin: "ಆಡ್ಮಿನ್",
-      logout: "ಲಾಗ್ ಔಟ್"
+      logout: "ಲಾಗ್ ಔಟ್",
+      userList: "ಬಳಕೆದಾರರ ಪಟ್ಟಿ"
     }
   };
 
@@ -92,6 +96,7 @@ const Sidebar = ({ className }: SidebarProps) => {
   // Admin items would be conditionally displayed based on user role
   const adminItems = [
     { name: t.settings, icon: <Settings size={20} />, path: '/admin' },
+    { name: t.userList, icon: <Users size={20} />, path: '/admin/users' },
   ];
 
   const sidebarContent = (

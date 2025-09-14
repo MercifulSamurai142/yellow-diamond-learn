@@ -2,7 +2,7 @@
 import React, { createContext, useContext, useState, ReactNode, useEffect } from 'react';
 
 // Define the supported languages
-type Language = 'english' | 'hindi' | 'kannada';
+export type Language = 'english' | 'hindi' | 'kannada';
 
 // Define the shape of the language context
 interface LanguageContextType {

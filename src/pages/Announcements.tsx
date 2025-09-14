@@ -50,10 +50,12 @@ const Announcements = () => {
     const fetchAnnouncements = async () => {
       setIsLoading(true);
       try {
+        const today = new Date().toISOString();
         const { data, error } = await supabase
           .from('announcements')
           .select('*')
           .eq('language', currentLanguage)
+          .or(`expire_at.is.null,expire_at.gt.${today}`)
           .order('created_at', { ascending: false });
 
         if (error) throw error;
