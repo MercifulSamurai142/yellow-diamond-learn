@@ -18,7 +18,7 @@ import Progress from "./pages/Progress";
 import Admin from "./pages/Admin";
 import UserListPage from "./pages/UserListPage";
 import NotFound from "./pages/NotFound";
-import ResetPasswordPage from "./pages/ResetPasswordPage";
+import ResetPasswordPage from "./pages/ResetPasswordPage"; // Import the new component
 import { AuthProvider } from "./contexts/AuthContext";
 import {ProgressProvider} from "./contexts/ProgressContext"
 import { LanguageProvider } from "./contexts/LanguageContext";
@@ -107,7 +107,7 @@ const App = () => (
                   </ProtectedRoute>
                 } />
                 <Route path="/admin" element={
-                  <ProtectedRoute requiredRole="admin">
+                  <ProtectedRoute requiredRole={['admin', 'region admin']}>
                     <Admin />
                   </ProtectedRoute>
                 } />

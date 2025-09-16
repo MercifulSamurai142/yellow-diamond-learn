@@ -1,7 +1,6 @@
 import { useState, useEffect } from "react";
 import Header from "@/components/layout/Header";
 import Sidebar from "@/components/layout/Sidebar";
-import ProtectedRoute from "@/components/ProtectedRoute";
 import YDButton from "@/components/ui/YDButton";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -12,6 +11,7 @@ import QuizManager from "@/components/admin/QuizManager";
 import AnnouncementManager from "@/components/admin/AnnouncementManager";
 import { Tables } from "@/integrations/supabase/types";
 import { useAuth } from "@/contexts/AuthContext";
+import { useProfile } from "@/hooks/useProfile";
 
 export type Module = Tables<"modules">;
 export type Lesson = Tables<"lessons">;
@@ -27,6 +27,7 @@ export type ModuleRegion = Tables<"module_region">;
 
 const Admin = () => {
   const { user: authUser } = useAuth();
+  const { profile } = useProfile();
   const [activeTab, setActiveTab] = useState<string>("modules");
   const [isLoading, setIsLoading] = useState(false);
   const [modules, setModules] = useState<Module[]>([]);
@@ -37,23 +38,61 @@ const Admin = () => {
   const [moduleRegions, setModuleRegions] = useState<ModuleRegion[]>([]);
 
   useEffect(() => {
-    loadData();
-  }, [authUser]);
+    if (profile) {
+      loadData();
+    }
+  }, [authUser, profile]);
 
   const loadData = async () => {
+    if (!profile) return;
     setIsLoading(true);
     try {
-      const { data: modulesData, error: modulesError } = await supabase.from("modules").select("*").order("order");
-      if (modulesError) throw modulesError;
-      setModules(modulesData || []);
+      let finalModules: Module[] = [];
+      let finalLessons: Lesson[] = [];
+      let finalQuizzes: Quiz[] = [];
+      
+      if (profile.role === 'admin') {
+          const { data: modulesData, error: modulesError } = await supabase.from("modules").select("*").order("order");
+          if (modulesError) throw modulesError;
+          finalModules = modulesData || [];
 
-      const { data: lessonsData, error: lessonsError } = await supabase.from("lessons").select("*").order("module_id, order");
-      if (lessonsError) throw lessonsError;
-      setLessons(lessonsData || []);
+      } else if (profile.role === 'region admin' && profile.region) {
+          const { data: regionModuleData, error: regionModuleError } = await supabase
+              .from('module_region')
+              .select('module_id')
+              .eq('region', profile.region);
+          if (regionModuleError) throw regionModuleError;
+          
+          const moduleIds = regionModuleData.map(item => item.module_id);
 
-      const { data: quizzesData, error: quizzesError } = await supabase.from("quizzes").select("*");
-      if (quizzesError) throw quizzesError;
-      setQuizzes(quizzesData || []);
+          if (moduleIds.length > 0) {
+              const { data: modulesData, error: modulesError } = await supabase
+                  .from("modules")
+                  .select("*")
+                  .in("id", moduleIds)
+                  .order("order");
+              if (modulesError) throw modulesError;
+              finalModules = modulesData || [];
+          }
+      }
+
+      setModules(finalModules);
+
+      if (finalModules.length > 0) {
+          const moduleIds = finalModules.map(m => m.id);
+          const { data: lessonsData, error: lessonsError } = await supabase.from("lessons").select("*").in("module_id", moduleIds).order("module_id, order");
+          if (lessonsError) throw lessonsError;
+          finalLessons = lessonsData || [];
+          setLessons(finalLessons);
+
+          if (finalLessons.length > 0) {
+              const lessonIds = finalLessons.map(l => l.id);
+              const { data: quizzesData, error: quizzesError } = await supabase.from("quizzes").select("*").in("lesson_id", lessonIds);
+              if (quizzesError) throw quizzesError;
+              finalQuizzes = quizzesData || [];
+              setQuizzes(finalQuizzes);
+          }
+      }
 
       const { data: announcementsData, error: announcementsError } = await supabase.from("announcements").select("*").order("created_at", { ascending: false });
       if (announcementsError) throw announcementsError;
@@ -80,7 +119,6 @@ const Admin = () => {
   };
 
   return (
-    <ProtectedRoute requiredRole="admin">
       <div className="flex h-screen bg-background">
         <Sidebar />
         <div className="flex flex-col flex-1 overflow-hidden">
@@ -142,7 +180,6 @@ const Admin = () => {
           </main>
         </div>
       </div>
-    </ProtectedRoute>
   );
 };
 
