@@ -204,6 +204,7 @@ const UserManager = ({ users, stagedUsers, onUsersUpdate, refreshData }: UserMan
                             <SelectContent>
                               <SelectItem value="learner">Learner</SelectItem>
                               <SelectItem value="admin">Admin</SelectItem>
+                              <SelectItem value="region admin">Region Admin</SelectItem>
                             </SelectContent>
                           </Select>
                           <Input
@@ -231,8 +232,10 @@ const UserManager = ({ users, stagedUsers, onUsersUpdate, refreshData }: UserMan
                         <h4 className="font-medium">{user.name || 'Unnamed User'}</h4>
                         <p className="text-sm text-muted-foreground">{user.email}</p>
                         <div className="flex items-center gap-2 mt-1">
-                            <span className={`text-xs px-2 py-1 rounded-full ${
-                              user.role === 'admin' ? 'bg-primary/20 text-primary' : 'bg-gray-100'
+                            <span className={`text-xs px-2 py-1 rounded-full capitalize ${
+                              user.role === 'admin' ? 'bg-primary/20 text-primary' 
+                              : user.role === 'region admin' ? 'bg-purple-100 text-purple-800'
+                              : 'bg-gray-100'
                             }`}>
                               {user.role}
                             </span>

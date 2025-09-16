@@ -4,7 +4,7 @@ import { useProfile } from "@/hooks/useProfile";
 
 type ProtectedRouteProps = {
   children: React.ReactNode;
-  requiredRole?: string;
+  requiredRole?: string | string[];
 };
 
 const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
@@ -28,9 +28,17 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
   }
 
   // If requiredRole is specified, check user's role
-  if (requiredRole && profile && profile.role !== requiredRole) {
+  if (requiredRole && profile) {
+    const userRole = profile.role;
+    const roles = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
+    if (!roles.includes(userRole)) {
+      return <Navigate to="/dashboard" replace />;
+    }
+  } else if (requiredRole && !profile) {
+    // If a role is required but there's no profile, they can't access it.
     return <Navigate to="/dashboard" replace />;
   }
+
 
   return <>{children}</>;
 };
