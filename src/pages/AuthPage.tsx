@@ -79,6 +79,13 @@ const AuthPage = () => {
       {/* Logo and branding section */}
       <div className="bg-yd-navy md:w-1/2 p-8 flex flex-col justify-center items-center">
         <div className="max-w-md text-center">
+          <div className="md:hidden text-center mb-8">
+            <img
+              src="https://www.yellowdiamond.in/wp-content/uploads/2024/06/YD-logo@2x.png"
+              alt="Yellow Diamond Logo"
+             className="max-w-[150px] mx-auto"
+            />
+          </div>
           <div className="mb-6 inline-flex items-center justify-center p-4 bg-yd-yellow rounded-xl">
             <h1 className="text-2xl md:text-3xl font-bold text-yd-navy">Yellow Diamond Academy</h1>
           </div>
@@ -90,13 +97,13 @@ const AuthPage = () => {
               alt="E-learning illustration" 
               className="max-w-xs mx-auto"
             />
-          </div>
+          </div>          
         </div>
       </div>
 
       {/* Authentication form */}
       <div className="bg-background md:w-1/2 p-8 flex items-center justify-center">
-        <div className="w-full max-w-md">
+        <div className="w-full max-w-md">        
           <div className="text-center mb-8">
             <h3 className="text-2xl font-bold text-yd-navy">
               {isLogin ? "Welcome Back!" : "Create Account"}

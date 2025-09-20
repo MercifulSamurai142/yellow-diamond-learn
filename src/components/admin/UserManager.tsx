@@ -22,6 +22,7 @@ const UserManager = ({ users, stagedUsers, onUsersUpdate, refreshData }: UserMan
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [editUserData, setEditUserData] = useState({
     name: '',
+    email: '',
     role: 'learner',
     designation: '',
     region: '',
@@ -73,6 +74,7 @@ const UserManager = ({ users, stagedUsers, onUsersUpdate, refreshData }: UserMan
     setEditingUserId(userId);
     setEditUserData({
       name: user.name || '',
+      email: user.email || '',
       role: user.role,
       designation: user.designation || '',
       region: user.region || '',
@@ -90,6 +92,7 @@ const UserManager = ({ users, stagedUsers, onUsersUpdate, refreshData }: UserMan
         .from("users")
         .update({
           name: editUserData.name,
+          email: editUserData.email,
           role: editUserData.role,
           designation: editUserData.designation,
           region: editUserData.region,
@@ -190,6 +193,12 @@ const UserManager = ({ users, stagedUsers, onUsersUpdate, refreshData }: UserMan
                             placeholder="User name"
                           />
                           <Input
+                            value={editUserData.email}
+                            type="email"
+                            onChange={(e) => setEditUserData({ ...editUserData, email: e.target.value })}
+                            placeholder="User email"
+                          />
+                          <Input
                             value={editUserData.designation}
                             onChange={(e) => setEditUserData({ ...editUserData, designation: e.target.value })}
                             placeholder="Designation"
@@ -226,6 +235,22 @@ const UserManager = ({ users, stagedUsers, onUsersUpdate, refreshData }: UserMan
                             </SelectContent>
                           </Select>
                         </div>
+                        <div className="flex justify-end gap-2 mt-4">
+                          <YDButton
+                            variant="default"
+                            size="sm"
+                            onClick={() => handleSaveUser(user.id)}
+                          >
+                            <Save size={16} className="mr-1" /> Save
+                          </YDButton>
+                          <YDButton
+                            variant="outline"
+                            size="sm"
+                            onClick={handleCancelEdit}
+                          >
+                            <X size={16} className="mr-1" /> Cancel
+                          </YDButton>
+                        </div>
                       </div>
                     ) : (
                       <>
@@ -252,24 +277,7 @@ const UserManager = ({ users, stagedUsers, onUsersUpdate, refreshData }: UserMan
                 </div>
                 
                 <div className="flex gap-2">
-                  {editingUserId === user.id && user.status === 'onboarded' ? (
-                    <>
-                      <YDButton
-                        variant="default"
-                        size="sm"
-                        onClick={() => handleSaveUser(user.id)}
-                      >
-                        <Save size={16} className="mr-1" /> Save
-                      </YDButton>
-                      <YDButton
-                        variant="outline"
-                        size="sm"
-                        onClick={handleCancelEdit}
-                      >
-                        <X size={16} className="mr-1" /> Cancel
-                      </YDButton>
-                    </>
-                  ) : (
+                  {editingUserId !== user.id && (
                     <YDButton
                       variant="outline"
                       size="sm"

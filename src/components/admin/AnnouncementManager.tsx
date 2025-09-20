@@ -37,6 +37,7 @@ const AnnouncementManager = ({ announcements, onAnnouncementsUpdate, refreshData
   const [isCalendarOpen, setIsCalendarOpen] = useState(false);
   const [confirmingDeleteId, setConfirmingDeleteId] = useState<string | null>(null);
   const [confirmingDeleteExpired, setConfirmingDeleteExpired] = useState(false);
+  const [isDownloadingId, setIsDownloadingId] = useState<string | null>(null);
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, fileType: 'document' | 'image') => {
     const file = e.target.files?.[0];
@@ -214,6 +215,52 @@ const AnnouncementManager = ({ announcements, onAnnouncementsUpdate, refreshData
     }
   };
 
+  const handleDownload = async (url: string, announcementId: string) => {
+    if (!url) return;
+    setIsDownloadingId(announcementId);
+    try {
+        const urlParts = url.split('/announcement-files/');
+        if (urlParts.length < 2) {
+            throw new Error("Invalid announcement file URL format.");
+        }
+        const filePath = urlParts[1];
+        const fileName = filePath.split('/').pop() || 'download';
+
+        const { data, error } = await supabase.storage
+            .from('announcement-files')
+            .download(filePath);
+
+        if (error) throw error;
+        if (!data) throw new Error("No file data received.");
+
+        const blob = new Blob([data], { type: data.type });
+        const blobUrl = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = blobUrl;
+        link.setAttribute('download', fileName);
+        document.body.appendChild(link);
+        link.click();
+
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(blobUrl);
+
+        toast({
+            title: "Download Started",
+            description: `Downloading ${fileName}.`
+        });
+
+    } catch (error: any) {
+        console.error("Download error:", error);
+        toast({
+            variant: "destructive",
+            title: "Download Failed",
+            description: error.message || "Could not download the attachment."
+        });
+    } finally {
+        setIsDownloadingId(null);
+    }
+  };
+
   const resetForm = () => {
     setIsAdding(false);
     setEditingId(null);
@@ -360,7 +407,20 @@ const AnnouncementManager = ({ announcements, onAnnouncementsUpdate, refreshData
                     <p className="text-muted-foreground mt-1 line-clamp-2">{announcement.description}</p>
                     <div className="flex items-center gap-4 mt-2">
                         {announcement.url && (
-                            <a href={announcement.url} target="_blank" rel="noopener noreferrer" className="text-sm text-primary hover:underline inline-block">View Attachment</a>
+                            <button
+                                onClick={() => handleDownload(announcement.url!, announcement.id)}
+                                disabled={isDownloadingId === announcement.id}
+                                className="text-sm text-primary hover:underline inline-flex items-center gap-1 disabled:opacity-50 disabled:cursor-wait"
+                            >
+                                {isDownloadingId === announcement.id ? (
+                                    <>
+                                        <Loader2 size={14} className="animate-spin" />
+                                        <span>Downloading...</span>
+                                    </>
+                                ) : (
+                                    <span>View Attachment</span>
+                                )}
+                            </button>
                         )}
                         {announcement.image_url && (
                             <span className="text-sm text-muted-foreground inline-block">Has Cover Image</span>
