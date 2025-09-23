@@ -52,7 +52,7 @@ const ModuleDetail = () => {
 
         // Additionally check if the module's language matches the current selected language.
         // If not, we still display the module but will filter its lessons.
-        if (moduleData.language && moduleData.language !== currentLanguage) {
+        if (moduleData?.language && moduleData.language !== currentLanguage) {
              console.warn(`Module ${moduleId} is in ${moduleData.language}, but current language is ${currentLanguage}. Displaying module anyway but filtering lessons.`);
         }
 

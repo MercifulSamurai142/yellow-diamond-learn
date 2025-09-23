@@ -6,20 +6,35 @@ import { toast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Pencil, Save, User, Search, X } from "lucide-react";
-import { UserProfile, StagedUser } from "@/pages/Admin";
+import { Pencil, Save, User, Search, X, UserX, Loader2, UserCheck } from "lucide-react";
+import { UserProfile, StagedUser, RevokedUser } from "@/pages/UserListPage";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface UserManagerProps {
   users: UserProfile[];
   stagedUsers: StagedUser[];
+  revokedUsers: RevokedUser[];
   onUsersUpdate: (users: UserProfile[]) => void;
   refreshData: () => Promise<void>;
 }
 
 const REGION_OPTIONS = ["North", "South", "East", "West", "Central"];
 
-const UserManager = ({ users, stagedUsers, onUsersUpdate, refreshData }: UserManagerProps) => {
+const UserManager = ({ users, stagedUsers, revokedUsers, onUsersUpdate, refreshData }: UserManagerProps) => {
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
+  const [revokingUser, setRevokingUser] = useState<UserProfile | null>(null);
+  const [unrevokingUser, setUnrevokingUser] = useState<UserProfile | null>(null);
+  const [isRevoking, setIsRevoking] = useState(false);
+  const [isUnrevoking, setIsUnrevoking] = useState(false);
   const [editUserData, setEditUserData] = useState({
     name: '',
     email: '',
@@ -29,31 +44,48 @@ const UserManager = ({ users, stagedUsers, onUsersUpdate, refreshData }: UserMan
     state: ''
   });
   const [searchTerm, setSearchTerm] = useState('');
-  const [filter, setFilter] = useState<'all' | 'onboarded' | 'not onboarded'>('all');
+  const [filter, setFilter] = useState<'all' | 'onboarded' | 'not onboarded' | 'revoked'>('all');
+  
+  const revokedEmailsSet = useMemo(() => new Set(revokedUsers.map(u => u.email)), [revokedUsers]);
 
   const combinedAndFilteredUsers = useMemo(() => {
-    const onboardedEmails = new Set(users.map(u => u.email));
+    let combined: any[] = [];
 
-    const onboarded = users.map(u => ({ ...u, status: 'onboarded' as const }));
-
-    const notOnboarded = stagedUsers
-      .filter(su => su.email && !onboardedEmails.has(su.email))
-      .map(su => ({
-        ...su,
-        id: su.email!,
-        status: 'not onboarded' as const,
-        role: su.role || 'learner',
-        profile_picture: null
-      }));
-
-    let combined: (typeof onboarded[number] | typeof notOnboarded[number])[] = [];
-
-    if (filter === 'all') {
-        combined = [...onboarded, ...notOnboarded];
-    } else if (filter === 'onboarded') {
-        combined = onboarded;
+    if (filter === 'revoked') {
+        combined = revokedUsers.map(ru => ({
+            ...ru,
+            id: ru.email, // Use email as unique key for rendering
+            status: 'revoked' as const,
+            isRevoked: true,
+            profile_picture: null
+        }));
     } else {
-        combined = notOnboarded;
+        const onboardedEmails = new Set(users.map(u => u.email));
+
+        const onboarded = users.map(u => ({ 
+          ...u, 
+          status: 'onboarded' as const,
+          isRevoked: u.email ? revokedEmailsSet.has(u.email) : false,
+        }));
+
+        const notOnboarded = stagedUsers
+          .filter(su => su.email && !onboardedEmails.has(su.email))
+          .map(su => ({
+            ...su,
+            id: su.email!,
+            status: 'not onboarded' as const,
+            isRevoked: su.email ? revokedEmailsSet.has(su.email) : false,
+            role: su.role || 'learner',
+            profile_picture: null
+          }));
+        
+        if (filter === 'all') {
+            combined = [...onboarded, ...notOnboarded];
+        } else if (filter === 'onboarded') {
+            combined = onboarded;
+        } else { // not onboarded
+            combined = notOnboarded;
+        }
     }
 
     if (!searchTerm) return combined;
@@ -65,7 +97,7 @@ const UserManager = ({ users, stagedUsers, onUsersUpdate, refreshData }: UserMan
         (u.role && u.role.toLowerCase().includes(lowerSearch)) ||
         (u.designation && u.designation.toLowerCase().includes(lowerSearch))
     );
-  }, [users, stagedUsers, filter, searchTerm]);
+  }, [users, stagedUsers, revokedUsers, filter, searchTerm, revokedEmailsSet]);
 
   const handleEditUser = (userId: string) => {
     const user = users.find(u => u.id === userId);
@@ -106,20 +138,6 @@ const UserManager = ({ users, stagedUsers, onUsersUpdate, refreshData }: UserMan
         title: "Success",
         description: "User updated successfully",
       });
-
-      // Update local state
-      const updatedUsers = users.map(user => {
-        if (user.id === userId) {
-          return {
-            ...user,
-            ...editUserData
-          };
-        }
-        return user;
-      });
-      onUsersUpdate(updatedUsers);
-
-      // Reset edit state
       setEditingUserId(null);
       await refreshData();
     } catch (error) {
@@ -129,6 +147,69 @@ const UserManager = ({ users, stagedUsers, onUsersUpdate, refreshData }: UserMan
         title: "Error",
         description: "Failed to update user",
       });
+    }
+  };
+  
+  const handleRevokeUser = async () => {
+    if (!revokingUser) return;
+    setIsRevoking(true);
+    try {
+        const { error } = await supabase.from('revoked_users').insert({
+            email: revokingUser.email,
+            name: revokingUser.name,
+            psl_id: revokingUser.psl_id || 'NOT_AVAILABLE', // Fallback for non-nullable column
+            designation: revokingUser.designation,
+            region: revokingUser.region,
+            state: revokingUser.state,
+            role: revokingUser.role,
+            timestamp: new Date().toISOString()
+        });
+        if (error) throw error;
+        toast({
+            title: "User Revoked",
+            description: `${revokingUser.name || revokingUser.email} has been scheduled for deletion.`,
+        });
+        await refreshData();
+    } catch (error: any) {
+        console.error("Error revoking user:", error);
+        toast({
+            variant: "destructive",
+            title: "Revocation Failed",
+            description: `Failed to revoke user: ${error.message}`
+        });
+    } finally {
+        setIsRevoking(false);
+        setRevokingUser(null);
+    }
+  };
+  
+  const handleUnrevokeUser = async () => {
+    if (!unrevokingUser) return;
+    setIsUnrevoking(true);
+    try {
+      const { error } = await supabase
+        .from('revoked_users')
+        .delete()
+        .eq('email', unrevokingUser.email);
+        
+      if (error) throw error;
+      
+      toast({
+        title: "User Reinstated",
+        description: `${unrevokingUser.name || unrevokingUser.email} has been removed from the revocation list.`,
+      });
+      
+      await refreshData();
+    } catch (error: any) {
+      console.error("Error un-revoking user:", error);
+      toast({
+          variant: "destructive",
+          title: "Action Failed",
+          description: `Failed to reinstate user: ${error.message}`
+      });
+    } finally {
+      setIsUnrevoking(false);
+      setUnrevokingUser(null);
     }
   };
 
@@ -145,6 +226,7 @@ const UserManager = ({ users, stagedUsers, onUsersUpdate, refreshData }: UserMan
                   <SelectItem value="all">All Users</SelectItem>
                   <SelectItem value="onboarded">Onboarded</SelectItem>
                   <SelectItem value="not onboarded">Not Onboarded</SelectItem>
+                  <SelectItem value="revoked">Revoked Users</SelectItem>
               </SelectContent>
           </Select>
         </div>
@@ -187,69 +269,28 @@ const UserManager = ({ users, stagedUsers, onUsersUpdate, refreshData }: UserMan
                     {editingUserId === user.id && user.status === 'onboarded' ? (
                       <div className="space-y-2">
                         <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                          <Input
-                            value={editUserData.name}
-                            onChange={(e) => setEditUserData({ ...editUserData, name: e.target.value })}
-                            placeholder="User name"
-                          />
-                          <Input
-                            value={editUserData.email}
-                            type="email"
-                            onChange={(e) => setEditUserData({ ...editUserData, email: e.target.value })}
-                            placeholder="User email"
-                          />
-                          <Input
-                            value={editUserData.designation}
-                            onChange={(e) => setEditUserData({ ...editUserData, designation: e.target.value })}
-                            placeholder="Designation"
-                          />
-                          <Select
-                            value={editUserData.role}
-                            onValueChange={(value) => setEditUserData({ ...editUserData, role: value })}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select role" />
-                            </SelectTrigger>
+                          <Input value={editUserData.name} onChange={(e) => setEditUserData({ ...editUserData, name: e.target.value })} placeholder="User name" />
+                          <Input value={editUserData.email} type="email" onChange={(e) => setEditUserData({ ...editUserData, email: e.target.value })} placeholder="User email" />
+                          <Input value={editUserData.designation} onChange={(e) => setEditUserData({ ...editUserData, designation: e.target.value })} placeholder="Designation" />
+                          <Select value={editUserData.role} onValueChange={(value) => setEditUserData({ ...editUserData, role: value })}>
+                            <SelectTrigger><SelectValue placeholder="Select role" /></SelectTrigger>
                             <SelectContent>
                               <SelectItem value="learner">Learner</SelectItem>
                               <SelectItem value="admin">Admin</SelectItem>
                               <SelectItem value="region admin">Region Admin</SelectItem>
                             </SelectContent>
                           </Select>
-                          <Input
-                            value={editUserData.state}
-                            onChange={(e) => setEditUserData({ ...editUserData, state: e.target.value })}
-                            placeholder="State"
-                          />
-                          <Select
-                            value={editUserData.region}
-                            onValueChange={(value) => setEditUserData({ ...editUserData, region: value })}
-                          >
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select region" />
-                            </SelectTrigger>
+                          <Input value={editUserData.state} onChange={(e) => setEditUserData({ ...editUserData, state: e.target.value })} placeholder="State" />
+                          <Select value={editUserData.region} onValueChange={(value) => setEditUserData({ ...editUserData, region: value })}>
+                            <SelectTrigger><SelectValue placeholder="Select region" /></SelectTrigger>
                             <SelectContent>
-                              {REGION_OPTIONS.map(region => (
-                                  <SelectItem key={region} value={region}>{region}</SelectItem>
-                              ))}
+                              {REGION_OPTIONS.map(region => (<SelectItem key={region} value={region}>{region}</SelectItem>))}
                             </SelectContent>
                           </Select>
                         </div>
                         <div className="flex justify-end gap-2 mt-4">
-                          <YDButton
-                            variant="default"
-                            size="sm"
-                            onClick={() => handleSaveUser(user.id)}
-                          >
-                            <Save size={16} className="mr-1" /> Save
-                          </YDButton>
-                          <YDButton
-                            variant="outline"
-                            size="sm"
-                            onClick={handleCancelEdit}
-                          >
-                            <X size={16} className="mr-1" /> Cancel
-                          </YDButton>
+                          <YDButton variant="default" size="sm" onClick={() => handleSaveUser(user.id)}><Save size={16} className="mr-1" /> Save</YDButton>
+                          <YDButton variant="outline" size="sm" onClick={handleCancelEdit}><X size={16} className="mr-1" /> Cancel</YDButton>
                         </div>
                       </div>
                     ) : (
@@ -257,17 +298,11 @@ const UserManager = ({ users, stagedUsers, onUsersUpdate, refreshData }: UserMan
                         <h4 className="font-medium">{user.name || 'Unnamed User'}</h4>
                         <p className="text-sm text-muted-foreground">{user.email}</p>
                         <div className="flex items-center gap-2 mt-1">
-                            <span className={`text-xs px-2 py-1 rounded-full capitalize ${
-                              user.role === 'admin' ? 'bg-primary/20 text-primary' 
-                              : user.role === 'region admin' ? 'bg-purple-100 text-purple-800'
-                              : 'bg-gray-100'
-                            }`}>
+                            <span className={`text-xs px-2 py-1 rounded-full capitalize ${ user.role === 'admin' ? 'bg-primary/20 text-primary' : user.role === 'region admin' ? 'bg-purple-100 text-purple-800' : 'bg-gray-100'}`}>
                               {user.role}
                             </span>
-                            <span className={`capitalize text-xs px-2 py-1 rounded-full ${
-                              user.status === 'onboarded' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'
-                            }`}>
-                                {user.status}
+                             <span className={`capitalize text-xs px-2 py-1 rounded-full ${user.status === 'revoked' ? 'bg-red-100 text-red-800' : user.isRevoked ? 'bg-red-100 text-red-800' : user.status === 'onboarded' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800' }`}>
+                                {user.status === 'revoked' ? 'Revoked' : user.isRevoked ? 'Revoked' : user.status}
                             </span>
                            {user.designation && <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800">{user.designation}</span>}
                         </div>
@@ -278,14 +313,23 @@ const UserManager = ({ users, stagedUsers, onUsersUpdate, refreshData }: UserMan
                 
                 <div className="flex gap-2">
                   {editingUserId !== user.id && (
-                    <YDButton
-                      variant="outline"
-                      size="sm"
-                      onClick={() => user.status === 'onboarded' && handleEditUser(user.id)}
-                      disabled={user.status !== 'onboarded'}
-                    >
-                      <Pencil size={16} className="mr-1" /> Edit
-                    </YDButton>
+                    <>
+                      {user.status === 'onboarded' && !user.isRevoked && (
+                          <>
+                              <YDButton variant="outline" size="sm" onClick={() => handleEditUser(user.id)}>
+                                  <Pencil size={16} className="mr-1" /> Edit
+                              </YDButton>
+                              <YDButton variant="destructive" size="sm" onClick={() => setRevokingUser(user as UserProfile)}>
+                                  <UserX size={16} className="mr-1" /> Revoke
+                              </YDButton>
+                          </>
+                      )}
+                      {((user.status === 'onboarded' && user.isRevoked) || user.status === 'revoked') && (
+                          <YDButton variant="secondary" size="sm" onClick={() => setUnrevokingUser(user as UserProfile)}>
+                              <UserCheck size={16} className="mr-1" /> Unrevoke
+                          </YDButton>
+                      )}
+                    </>
                   )}
                 </div>
               </div>
@@ -293,6 +337,50 @@ const UserManager = ({ users, stagedUsers, onUsersUpdate, refreshData }: UserMan
           ))
         )}
       </div>
+
+      <AlertDialog open={!!revokingUser} onOpenChange={(open) => !open && setRevokingUser(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure you want to revoke this user?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will add <span className="font-semibold">{revokingUser?.name || revokingUser?.email}</span> to the revocation list. Their access will be removed by a scheduled process. This action can be reversed by an administrator before the process runs.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isRevoking}>Cancel</AlertDialogCancel>
+            <YDButton
+              variant="destructive"
+              onClick={handleRevokeUser}
+              disabled={isRevoking}
+            >
+              {isRevoking && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Yes, Revoke User
+            </YDButton>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog open={!!unrevokingUser} onOpenChange={(open) => !open && setUnrevokingUser(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Are you sure you want to reinstate this user?</AlertDialogTitle>
+            <AlertDialogDescription>
+              This will remove <span className="font-semibold">{unrevokingUser?.name || unrevokingUser?.email}</span> from the revocation list, cancelling their scheduled deletion.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isUnrevoking}>Cancel</AlertDialogCancel>
+            <YDButton
+              variant="secondary"
+              onClick={handleUnrevokeUser}
+              disabled={isUnrevoking}
+            >
+              {isUnrevoking && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Yes, Reinstate User
+            </YDButton>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 };

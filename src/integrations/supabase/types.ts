@@ -384,6 +384,39 @@ export type Database = {
           },
         ]
       }
+      revoked_users: {
+        Row: {
+          email: string
+          name: string | null          
+          psl_id: string
+          designation: string | null
+          region: string | null
+          state: string | null
+          role: string | null
+          timestamp: string | null
+        }
+        Insert: {
+          email?: string | null
+          name?: string | null          
+          psl_id: string
+          designation?: string | null
+          region?: string | null
+          state?: string | null
+          role?: string | null
+          timestamp?: string | null
+        }
+        Update: {
+          email?: string | null
+          name?: string | null          
+          psl_id: string
+          designation?: string | null
+          region?: string | null
+          state?: string | null
+          role?: string | null
+          timestamp?: string | null
+        }
+        Relationships: []
+      }
       user_achievements: {
         Row: {
           achievement_id: string | null
