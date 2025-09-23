@@ -11,10 +11,12 @@ import { Loader2 } from "lucide-react";
 
 export type UserProfile = Tables<"users">;
 export type StagedUser = Tables<"user_import_staging">;
+export type RevokedUser = Tables<"revoked_users">;
 
 const UserListPage = () => {
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [stagedUsers, setStagedUsers] = useState<StagedUser[]>([]);
+  const [revokedUsers, setRevokedUsers] = useState<RevokedUser[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
@@ -37,6 +39,14 @@ const UserListPage = () => {
         .order("email");
       if (stagedUsersError) throw stagedUsersError;
       setStagedUsers(stagedUsersData || []);
+
+      const { data: revokedUsersData, error: revokedUsersError } = await supabase
+        .from("revoked_users")
+        .select("*")
+        .order("timestamp", { ascending: false });
+      if (revokedUsersError) throw revokedUsersError;
+      setRevokedUsers(revokedUsersData || []);
+
     } catch (error) {
       console.error("Error loading user data:", error);
       toast({
@@ -73,6 +83,7 @@ const UserListPage = () => {
                 <UserManager 
                   users={users} 
                   stagedUsers={stagedUsers}
+                  revokedUsers={revokedUsers}
                   onUsersUpdate={setUsers} 
                   refreshData={loadData} 
                 />
