@@ -127,7 +127,7 @@ const LessonDetail = () => {
         if (!lessonData) throw new Error(`Lesson with ID ${lessonId} not found.`);
 
         // Check if the fetched lesson's language matches the current selected language.
-        if (lessonData.language && lessonData.language !== currentLanguage) {
+        if (lessonData?.language && lessonData.language !== currentLanguage) {
              console.warn(`Lesson ${lessonId} is in ${lessonData.language}, but current language is ${currentLanguage}. Displaying anyway.`);
         }
 
