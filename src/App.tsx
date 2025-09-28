@@ -23,6 +23,8 @@ import { AuthProvider } from "./contexts/AuthContext";
 import {ProgressProvider} from "./contexts/ProgressContext"
 import { LanguageProvider } from "./contexts/LanguageContext";
 import ProtectedRoute from "./components/ProtectedRoute";
+import ProgressReport from "./pages/admin/ProgressReport";
+import ProgressDetail from "./pages/admin/ProgressDetail";
 
 // Create a single, stable QueryClient instance outside the component
 const queryClient = new QueryClient({
@@ -114,6 +116,16 @@ const App = () => (
                 <Route path="/admin/users" element={
                   <ProtectedRoute requiredRole="admin">
                     <UserListPage />
+                  </ProtectedRoute>
+                } />
+                <Route path="/admin/progress-report" element={
+                  <ProtectedRoute requiredRole="admin">
+                    <ProgressReport />
+                  </ProtectedRoute>
+                } />
+                <Route path="/admin/progress-report/:userId" element={
+                  <ProtectedRoute requiredRole="admin">
+                    <ProgressDetail />
                   </ProtectedRoute>
                 } />
 

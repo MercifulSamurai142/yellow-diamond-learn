@@ -12,7 +12,8 @@ import {
   X,
   LogOut,
   Megaphone,
-  Users
+  Users,
+  BarChartHorizontal
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -47,7 +48,8 @@ const Sidebar = ({ className }: SidebarProps) => {
       settings: "Settings",
       admin: "Admin",
       logout: "Logout",
-      userList: "User List"
+      userList: "User List",
+      progressReport: "Progress Report"
     },
     hindi: {
       companyName: "यलो डायमंड",
@@ -60,7 +62,8 @@ const Sidebar = ({ className }: SidebarProps) => {
       settings: "सेटिंग्स",
       admin: "एडमिन",
       logout: "लॉग आउट",
-      userList: "उपयोगकर्ता सूची"
+      userList: "उपयोगकर्ता सूची",
+      progressReport: "प्रगति रिपोर्ट"
     },
     kannada: {
       companyName: "ಯೆಲ್ಲೊ ಡೈಮಂಡ್",
@@ -73,7 +76,8 @@ const Sidebar = ({ className }: SidebarProps) => {
       settings: "ಸೆಟ್ಟಿಂಗ್‌ಗಳು",
       admin: "ಆಡ್ಮಿನ್",
       logout: "ಲಾಗ್ ಔಟ್",
-      userList: "ಬಳಕೆದಾರರ ಪಟ್ಟಿ"
+      userList: "ಬಳಕೆದಾರರ ಪಟ್ಟಿ",
+      progressReport: "ಪ್ರಗತಿ ವರದಿ"
     }
   };
 
@@ -81,7 +85,7 @@ const Sidebar = ({ className }: SidebarProps) => {
   const t = translations[currentLanguage] || translations.english;
 
   const isActive = (path: string) => {
-    return location.pathname === path;
+    return location.pathname.startsWith(path) && (path !== '/admin' || location.pathname === '/admin');
   };
 
   const navigationItems = [
@@ -97,6 +101,7 @@ const Sidebar = ({ className }: SidebarProps) => {
   const adminItems = [
     { name: t.settings, icon: <Settings size={20} />, path: '/admin', roles: ['admin', 'region admin'] },
     { name: t.userList, icon: <Users size={20} />, path: '/admin/users', roles: ['admin'] },
+    { name: t.progressReport, icon: <BarChartHorizontal size={20} />, path: '/admin/progress-report', roles: ['admin'] },
   ];
 
   const sidebarContent = (

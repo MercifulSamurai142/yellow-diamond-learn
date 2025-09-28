@@ -56,14 +56,14 @@ const Header = ({ className }: HeaderProps) => {
       </div>
       
       <div className="relative mx-4 flex-1 max-w-md hidden md:block">
-        <div className="absolute inset-y-0 left-0 flex items-center pl-3">
+        {/* <div className="absolute inset-y-0 left-0 flex items-center pl-3">
           <Search className="h-4 w-4 text-muted-foreground" />
         </div>
         <input
           type="search"
           placeholder="Search modules, lessons..."
           className="w-full rounded-md border bg-background px-3 py-2 pl-10 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        />
+        /> */},
       </div>
       
       <div className="flex items-center gap-4">
