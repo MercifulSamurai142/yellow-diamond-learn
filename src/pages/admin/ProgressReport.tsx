@@ -14,14 +14,19 @@ import * as XLSX from 'xlsx';
 // Types
 type User = Tables<'users'>;
 
+type LanguageProgress = {
+  percentage: number;
+  completed: number;
+  total: number;
+  totalQuizzes: number;
+  attemptedQuizzes: number;
+  averageScore: number | null;
+};
+
 type UserOverallProgress = {
   user: User;
   progressByLanguage: {
-    [key in 'english' | 'hindi' | 'kannada']: {
-      percentage: number;
-      completed: number;
-      total: number;
-    }
+    [key in 'english' | 'hindi' | 'kannada']: LanguageProgress;
   }
 };
 
@@ -42,13 +47,17 @@ const ProgressReport = () => {
           { data: regionsData, error: regionsError },
           { data: lessonsData, error: lessonsError },
           { data: progressData, error: progressError },
+          { data: quizzesData, error: quizzesError },
+          { data: quizResultsData, error: quizResultsError },
         ] = await Promise.all([
           supabase.from('users').select('*').order('name'),
           supabase.from('modules').select('id, language'),
           supabase.from('module_designation').select('*'),
           supabase.from('module_region').select('*'),
           supabase.from('lessons').select('id, module_id'),
-          supabase.from('user_progress').select('user_id, lesson_id').eq('status', 'completed')
+          supabase.from('user_progress').select('user_id, lesson_id').eq('status', 'completed'),
+          supabase.from('quizzes').select('id, lesson_id'),
+          supabase.from('quiz_results').select('user_id, quiz_id, score, created_at').order('created_at', { ascending: false }),
         ]);
 
         if (usersError) throw usersError;
@@ -57,86 +66,105 @@ const ProgressReport = () => {
         if (regionsError) throw regionsError;
         if (lessonsError) throw lessonsError;
         if (progressError) throw progressError;
+        if (quizzesError) throw quizzesError;
+        if (quizResultsError) throw quizResultsError;
         
         // --- Pre-process data for efficient lookup ---
         const designationsMap = new Map<string, string[]>();
-        for (const md of designationsData!) {
+        designationsData!.forEach(md => {
             if (!designationsMap.has(md.module_id)) designationsMap.set(md.module_id, []);
             designationsMap.get(md.module_id)!.push(md.designation);
-        }
+        });
 
         const regionsMap = new Map<string, string[]>();
-        for (const mr of regionsData!) {
+        regionsData!.forEach(mr => {
             if (!regionsMap.has(mr.module_id)) regionsMap.set(mr.module_id, []);
             regionsMap.get(mr.module_id)!.push(mr.region);
-        }
+        });
         
         const lessonsByModule = new Map<string, string[]>();
-        for (const lesson of lessonsData!) {
+        lessonsData!.forEach(lesson => {
             if (!lessonsByModule.has(lesson.module_id!)) lessonsByModule.set(lesson.module_id!, []);
             lessonsByModule.get(lesson.module_id!)!.push(lesson.id);
-        }
+        });
+
+        const quizzesByLesson = new Map<string, string[]>();
+        quizzesData!.forEach(quiz => {
+            if (!quizzesByLesson.has(quiz.lesson_id!)) quizzesByLesson.set(quiz.lesson_id!, []);
+            quizzesByLesson.get(quiz.lesson_id!)!.push(quiz.id);
+        });
 
         const completedLessonsByUser = new Map<string, Set<string>>();
-        for (const progress of progressData!) {
+        progressData!.forEach(progress => {
             if (!completedLessonsByUser.has(progress.user_id!)) completedLessonsByUser.set(progress.user_id!, new Set());
             completedLessonsByUser.get(progress.user_id!)!.add(progress.lesson_id!);
-        }
+        });
+
+        const latestQuizScoresByUser = new Map<string, Map<string, number>>();
+        quizResultsData!.forEach(result => {
+            if (!latestQuizScoresByUser.has(result.user_id)) {
+                latestQuizScoresByUser.set(result.user_id, new Map());
+            }
+            if (!latestQuizScoresByUser.get(result.user_id)!.has(result.quiz_id)) {
+                latestQuizScoresByUser.get(result.user_id)!.set(result.quiz_id, result.score);
+            }
+        });
+
 
         // --- Calculate progress for each user ---
         const calculatedProgress = usersData!.map(user => {
             const progress: UserOverallProgress = {
                 user,
                 progressByLanguage: {
-                    english: { percentage: 0, completed: 0, total: 0 },
-                    hindi: { percentage: 0, completed: 0, total: 0 },
-                    kannada: { percentage: 0, completed: 0, total: 0 },
+                    english: { percentage: 0, completed: 0, total: 0, totalQuizzes: 0, attemptedQuizzes: 0, averageScore: null },
+                    hindi: { percentage: 0, completed: 0, total: 0, totalQuizzes: 0, attemptedQuizzes: 0, averageScore: null },
+                    kannada: { percentage: 0, completed: 0, total: 0, totalQuizzes: 0, attemptedQuizzes: 0, averageScore: null },
                 }
             };
             
             (['english', 'hindi', 'kannada'] as const).forEach(lang => {
-                // 1. Find modules available to this user in this language
                 const availableModules = modulesData!.filter(module => {
                     if (module.language !== lang) return false;
-                    if (user.role === 'admin') return true; // Admins are eligible for all modules
-
+                    if (user.role === 'admin') return true;
                     const designations = designationsMap.get(module.id) || [];
                     const regions = regionsMap.get(module.id) || [];
-                    const isDesignationRestricted = designations.length > 0;
-                    const isRegionRestricted = regions.length > 0;
-
-                    if (!isDesignationRestricted && !isRegionRestricted) return false;
-
-                    const userMatchesDesignation = !isDesignationRestricted || (!!user.designation && designations.includes(user.designation));
-                    const userMatchesRegion = !isRegionRestricted || (!!user.region && regions.includes(user.region));
-
-                    return userMatchesDesignation && userMatchesRegion;
+                    if (designations.length === 0 && regions.length === 0) return false;
+                    const matchesDesignation = designations.length === 0 || (!!user.designation && designations.includes(user.designation));
+                    const matchesRegion = regions.length === 0 || (!!user.region && regions.includes(user.region));
+                    return matchesDesignation && matchesRegion;
                 });
                 
-                // 2. Get total lessons in those available modules
                 const availableLessonIds = new Set<string>();
                 availableModules.forEach(module => {
-                    const moduleLessons = lessonsByModule.get(module.id) || [];
-                    moduleLessons.forEach(lessonId => availableLessonIds.add(lessonId));
+                    (lessonsByModule.get(module.id) || []).forEach(lessonId => availableLessonIds.add(lessonId));
                 });
-                const totalLessons = availableLessonIds.size;
                 
-                // 3. Count how many of those lessons the user completed
                 const userCompletedSet = completedLessonsByUser.get(user.id) || new Set();
-                let completedCount = 0;
-                availableLessonIds.forEach(lessonId => {
-                    if (userCompletedSet.has(lessonId)) {
-                        completedCount++;
-                    }
-                });
-
-                // 4. Calculate percentage
+                const completedCount = Array.from(availableLessonIds).filter(id => userCompletedSet.has(id)).length;
+                const totalLessons = availableLessonIds.size;
                 const percentage = totalLessons > 0 ? Math.round((completedCount / totalLessons) * 100) : 0;
 
+                const availableQuizIds = new Set<string>();
+                availableLessonIds.forEach(lessonId => {
+                    (quizzesByLesson.get(lessonId) || []).forEach(quizId => availableQuizIds.add(quizId));
+                });
+
+                const userScores = latestQuizScoresByUser.get(user.id) || new Map();
+                const attemptedQuizzesScores = Array.from(availableQuizIds)
+                    .map(quizId => userScores.get(quizId))
+                    .filter((score): score is number => score !== undefined);
+                
+                const totalQuizzes = availableQuizIds.size;
+                const attemptedQuizzes = attemptedQuizzesScores.length;
+                const averageScore = attemptedQuizzes > 0 ? Math.round(attemptedQuizzesScores.reduce((a, b) => a + b, 0) / attemptedQuizzes) : null;
+                
                 progress.progressByLanguage[lang] = {
                     percentage,
                     completed: completedCount,
                     total: totalLessons,
+                    totalQuizzes,
+                    attemptedQuizzes,
+                    averageScore
                 };
             });
             
@@ -169,22 +197,35 @@ const ProgressReport = () => {
     setIsDownloading(true);
 
     try {
-        const dataForExcel = userProgressList.map(({ user, progressByLanguage }) => {
-            const getProgressString = (lang: 'english' | 'hindi' | 'kannada') => {
-                const progress = progressByLanguage[lang];
-                return `${progress.percentage}% (${progress.completed}/${progress.total} lessons)`;
-            };
-            return {
-                Name: user.name || 'N/A',
-                Email: user.email,
-                PSL: user.psl_id || 'N/A',
-                region: user.region || 'N/A',
-                English: getProgressString('english'),
-                Hindi: getProgressString('hindi'),
-                Kannada: getProgressString('kannada'),
-            };
+        const dataForExcel = userProgressList.flatMap(({ user, progressByLanguage }) => {
+            return Object.entries(progressByLanguage).map(([lang, progress]) => {
+                if(progress.completed === 0) return null;
+
+                const quizAttemptProgress = progress.totalQuizzes > 0 ? Math.round((progress.attemptedQuizzes / progress.totalQuizzes) * 100) : 0;
+                
+                return {
+                    "Name": user.name || 'N/A',
+                    "Email": user.email,
+                    "PSL ID": user.psl_id || 'N/A',
+                    "Region": user.region || 'N/A',
+                    "Language Attempted": lang,
+                    "Total Lessons": progress.total,
+                    "Lessons Completed": progress.completed,
+                    "Lesson Progress (%)": progress.percentage,
+                    "Total Quizzes": progress.totalQuizzes,
+                    "Quizzes Attempted": progress.attemptedQuizzes,
+                    "Quiz Attempt Progress (%)": quizAttemptProgress,
+                    "Average Quiz Score (%)": progress.averageScore ?? 'N/A',
+                };
+            }).filter(row => row !== null);
         });
         
+        if(dataForExcel.length === 0) {
+            toast({ title: "No Data", description: "No users have completed any lessons to generate a report.", variant: "destructive"});
+            setIsDownloading(false);
+            return;
+        }
+
         const worksheet = XLSX.utils.json_to_sheet(dataForExcel);
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, 'User Progress Report');
@@ -192,11 +233,16 @@ const ProgressReport = () => {
         worksheet['!cols'] = [
             { wch: 25 }, // Name
             { wch: 30 }, // Email
-            { wch: 30 }, // PSL
-            { wch: 30 }, // Region
-            { wch: 20 }, // English
-            { wch: 20 }, // Hindi
-            { wch: 20 }, // Kannada
+            { wch: 15 }, // PSL ID
+            { wch: 15 }, // Region
+            { wch: 20 }, // Language Attempted
+            { wch: 15 }, // Total Lessons
+            { wch: 18 }, // Lessons Completed
+            { wch: 20 }, // Lesson Progress (%)
+            { wch: 15 }, // Total Quizzes
+            { wch: 18 }, // Quizzes Attempted
+            { wch: 25 }, // Quiz Attempt Progress (%)
+            { wch: 25 }, // Average Quiz Score (%)
         ];
 
         const today = new Date();
