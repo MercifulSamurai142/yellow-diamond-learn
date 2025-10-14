@@ -511,6 +511,7 @@ export type Database = {
           psl_id: string | null
           designation: string | null
           state: string | null
+          language: string | null
         }
         Insert: {
           created_at?: string | null
@@ -524,6 +525,7 @@ export type Database = {
           psl_id?: string | null
           designation?: string | null
           state?: string | null
+          language?: string | null
         }
         Update: {
           created_at?: string | null
@@ -537,6 +539,7 @@ export type Database = {
           psl_id?: string | null
           designation?: string | null
           state?: string | null
+          language?: string | null
         }
         Relationships: []
       }
