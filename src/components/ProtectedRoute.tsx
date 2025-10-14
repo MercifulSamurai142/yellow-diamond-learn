@@ -1,3 +1,4 @@
+// yellow-diamond-learn-dev/src/components/ProtectedRoute.tsx
 import { Navigate, useLocation } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
@@ -5,9 +6,10 @@ import { useProfile } from "@/hooks/useProfile";
 type ProtectedRouteProps = {
   children: React.ReactNode;
   requiredRole?: string | string[];
+  requirePslIdEmpty?: boolean; // New prop
 };
 
-const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
+const ProtectedRoute = ({ children, requiredRole, requirePslIdEmpty = false }: ProtectedRouteProps) => {
   const { user, isLoading: authLoading } = useAuth();
   const { profile, isLoading: profileLoading } = useProfile();
   const location = useLocation();
@@ -27,6 +29,18 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
     return <Navigate to="/login" state={{ from: location }} replace />;
   }
 
+  // If requirePslIdEmpty is true, redirect to /dashboard if psl_id is NOT empty
+  if (requirePslIdEmpty && profile && profile.psl_id) {
+    return <Navigate to="/dashboard" replace />;
+  }
+
+  // If requirePslIdEmpty is FALSE, AND psl_id IS empty, redirect to /onboarding
+  // This ensures that users with empty psl_id cannot access other protected routes directly.
+  if (!requirePslIdEmpty && profile && !profile.psl_id && location.pathname !== '/onboarding') {
+    return <Navigate to="/onboarding" replace />;
+  }
+
+
   // If requiredRole is specified, check user's role
   if (requiredRole && profile) {
     const userRole = profile.role;
@@ -35,10 +49,10 @@ const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
       return <Navigate to="/dashboard" replace />;
     }
   } else if (requiredRole && !profile) {
-    // If a role is required but there's no profile, they can't access it.
+    // If a role is required but there's no profile (shouldn't happen here if psl_id check passes), they can't access it.
+    // Or if profile is still null after loading (error state or new user before onboarding)
     return <Navigate to="/dashboard" replace />;
   }
-
 
   return <>{children}</>;
 };

@@ -1,4 +1,4 @@
-// yellow-diamond-learn-main/src/App.tsx
+// yellow-diamond-learn-dev/src/App.tsx
 import { BrowserRouter, Routes, Route } from "react-router-dom";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { Toaster } from "@/components/ui/toaster";
@@ -11,6 +11,7 @@ import Modules from "./pages/modules/Modules";
 import ModuleDetail from "./pages/modules/ModuleDetail";
 import LessonDetail from "./pages/modules/LessonDetail";
 import Quiz from "./pages/modules/Quiz";
+import Onboarding from "./pages/Onboarding"; // Import the new Onboarding page
 import Announcements from "./pages/Announcements";
 import AnnouncementDetail from "./pages/modules/AnnouncementDetail";
 import CertificatesPage from "./pages/Certificates";
@@ -57,6 +58,13 @@ const AppContent = () => {
       <Route path="/" element={<AuthPage />} />
       <Route path="/login" element={<AuthPage />} />
       <Route path="/reset-password" element={<ResetPasswordPage />} />
+
+      {/* Onboarding route - accessible only if psl_id is empty */}
+      <Route path="/onboarding" element={
+        <ProtectedRoute requirePslIdEmpty={true}>
+          <Onboarding />
+        </ProtectedRoute>
+      } />
 
       {/* Protected routes */}
       <Route path="/dashboard" element={
@@ -124,7 +132,7 @@ const AppContent = () => {
         </ProtectedRoute>
       } />
       <Route path="/admin/progress-report" element={
-        <ProtectedRoute requiredRole="admin">
+        <ProtectedRoute requiredRole={['admin', 'region admin']}>
           <ProgressReport />
         </ProtectedRoute>
       } />

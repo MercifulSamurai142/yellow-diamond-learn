@@ -101,7 +101,7 @@ const Sidebar = ({ className }: SidebarProps) => {
   const adminItems = [
     { name: t.settings, icon: <Settings size={20} />, path: '/admin', roles: ['admin', 'region admin'] },
     { name: t.userList, icon: <Users size={20} />, path: '/admin/users', roles: ['admin'] },
-    { name: t.progressReport, icon: <BarChartHorizontal size={20} />, path: '/admin/progress-report', roles: ['admin'] },
+    { name: t.progressReport, icon: <BarChartHorizontal size={20} />, path: '/admin/progress-report', roles: ['admin', 'region admin'] },
   ];
 
   const sidebarContent = (

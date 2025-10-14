@@ -1,4 +1,4 @@
-// yellow-diamond-learn-main/src/contexts/AuthContext.tsx
+// yellow-diamond-learn-dev/src/contexts/AuthContext.tsx
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -83,8 +83,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 //console.log("AuthContext: On reset-password page, skipping dashboard navigate.");
                 return;
             }
-            if (location.pathname === '/login' || location.pathname === '/') {
-              //console.log("AuthContext: Navigating to /dashboard.");
+            if (location.pathname === '/login' || location.pathname === '/' || location.pathname === '/onboarding') { // Added /onboarding here
+              // After sign-in, if user is on login/root/onboarding, check if their profile is complete
+              // This check will be done by ProtectedRoute, which will redirect to /onboarding if psl_id is empty.
+              // If psl_id is NOT empty, ProtectedRoute will let them pass to /dashboard.
               navigate('/dashboard', { replace: true });
             }
             toast({
@@ -187,9 +189,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         email,
         password,
         options: {
+          emailRedirectTo: `${window.location.origin}/onboarding`, // Redirect to onboarding
           data: {
             name: stagedUser.name || 'New User',
-            language: 'english', // Include language from staged user, or default
+            language: 'english', // Default language on signup
           },
         },
       });
