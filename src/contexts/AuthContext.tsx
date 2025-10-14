@@ -4,6 +4,7 @@ import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
+import { useLanguage, Language } from '../contexts/LanguageContext'; // Import useLanguage and Language
 
 // Define the shape of our context
 type AuthContextType = {
@@ -34,22 +35,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const navigate = useNavigate();
   const location = useLocation();
+  const { setLanguage } = useLanguage(); // Access setLanguage from LanguageContext
+
+  //console.log("AuthProvider rendered. isLoading:", isLoading, "user:", user?.id);
 
   // Get initial session only once on mount
   useEffect(() => {
     const getInitialSession = async () => {
+      //console.log("AuthContext: getInitialSession started.");
       try {
         const { data, error } = await supabase.auth.getSession();
         if (error) {
-          console.error('Error getting session:', error);
+          console.error('AuthContext: Error getting initial session:', error);
           return;
         }
         setSession(data.session);
         setUser(data.session?.user ?? null);
+        //console.log("AuthContext: Initial session set. User:", data.session?.user?.id);
       } catch (error) {
-        console.error('Unexpected error during getSession:', error);
+        console.error('AuthContext: Unexpected error during getInitialSession:', error);
       } finally {
         setIsLoading(false);
+        //console.log("AuthContext: getInitialSession finished. isLoading set to false.");
       }
     };
 
@@ -58,22 +65,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Separate effect for auth state changes
   useEffect(() => {
+    //console.log("AuthContext: onAuthStateChange effect registered.");
     const { data: authListener } = supabase.auth.onAuthStateChange(
       async (event, session) => {
+        //console.log('AuthContext: onAuthStateChange event:', event, 'session:', session?.user?.id);
         // Only update state for explicit sign-in/sign-out events
         if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
-          console.log('Auth event:', event);
           setSession(session);
           setUser(session?.user ?? null);
+          //console.log("AuthContext: User/Session state updated by onAuthStateChange. New user:", session?.user?.id);
 
           if (event === 'SIGNED_IN' && session) {
-            // Check if the user is on the /reset-password page after a password reset.
-            // If so, do NOT redirect to dashboard immediately. The ResetPasswordPage will handle navigation.
+            // REMOVED: Fetching profile language here. This will now be handled in App.tsx
+            // once the profile is loaded via useProfile.
+
             if (location.pathname === '/reset-password') {
-                return; // Let ResetPasswordPage handle post-update navigation
+                //console.log("AuthContext: On reset-password page, skipping dashboard navigate.");
+                return;
             }
-            // Only navigate if explicitly signing in and not on a special auth page
             if (location.pathname === '/login' || location.pathname === '/') {
+              //console.log("AuthContext: Navigating to /dashboard.");
               navigate('/dashboard', { replace: true });
             }
             toast({
@@ -83,7 +94,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           }
 
           if (event === 'SIGNED_OUT') {
-            // Only navigate if explicitly signing out
+            //console.log("AuthContext: SIGNED_OUT event. Resetting language to english and navigating to /login.");
+            setLanguage('english'); // Reset language to English on sign out
             if (location.pathname !== '/login' && location.pathname !== '/') {
               navigate('/login', { replace: true });
             }
@@ -93,21 +105,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
             });
           }
         }
-        // Ignore all other events (like token refresh)
       }
     );
 
     return () => {
+      //console.log("AuthContext: onAuthStateChange listener unsubscribed.");
       authListener.subscription.unsubscribe();
     };
-  }, [navigate, location.pathname]);
+  }, [navigate, location.pathname, setLanguage]);
 
   // Sign in with email and password
   const signIn = async (email: string, password: string) => {
+    //console.log("AuthContext: signIn called for", email);
     try {
       const { error } = await supabase.auth.signInWithPassword({ email, password });
-
       if (error) {
+        console.error('AuthContext: signIn failed:', error);
         toast({
           variant: 'destructive',
           title: 'Sign in failed',
@@ -115,6 +128,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
         throw error;
       }
+      //console.log("AuthContext: signIn successful.");
     } catch (error) {
       throw error;
     }
@@ -122,6 +136,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Sign up with email and password
   const signUp = async (email: string, password: string) => {
+    //console.log("AuthContext: signUp called for", email);
     try {
       // 1. Check if email exists in the staging table for authorization
       const { data: stagedUser, error: stageError } = await supabase
@@ -131,10 +146,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .single();
 
       if (stageError && stageError.code !== 'PGRST116') { // PGRST116 means no rows are found.
+        console.error('AuthContext: stageError during signUp:', stageError);
         throw stageError;
       }
 
       if (!stagedUser) {
+        //console.log("AuthContext: User not found in staging for signUp:", email);
         toast({
           variant: 'destructive',
           title: 'Unauthorized user',
@@ -151,10 +168,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         .single();
 
       if (existingUserError && existingUserError.code !== 'PGRST116') {
+          console.error('AuthContext: existingUserError during signUp:', existingUserError);
           throw existingUserError;
       }
 
       if (existingUser) {
+          //console.log("AuthContext: Account already exists for signUp:", email);
           toast({
               variant: 'destructive',
               title: 'Account exists',
@@ -170,11 +189,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         options: {
           data: {
             name: stagedUser.name || 'New User',
+            language: 'english', // Include language from staged user, or default
           },
         },
       });
 
       if (signUpError) {
+        console.error('AuthContext: signUp failed:', signUpError);
         toast({
           variant: 'destructive',
           title: 'Sign up failed',
@@ -182,6 +203,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
         throw signUpError;
       } else {
+        //console.log("AuthContext: signUp successful, verification email sent.");
         toast({
           title: 'Account created',
           description: 'Please check your email for verification instructions.',
@@ -189,7 +211,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     } catch (error) {
       if (error instanceof Error) {
-        console.error("Sign up process failed:", error.message);
+        console.error("AuthContext: signUp process failed:", error.message);
       }
       throw error;
     }
@@ -197,9 +219,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Sign out
   const signOut = async () => {
+    //console.log("AuthContext: signOut called.");
     try {
       const { error } = await supabase.auth.signOut();
       if (error) {
+        console.error('AuthContext: signOut failed:', error);
         toast({
           variant: 'destructive',
           title: 'Sign out failed',
@@ -207,6 +231,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
         throw error;
       }
+      //console.log("AuthContext: signOut successful.");
     } catch (error) {
       throw error;
     }
@@ -214,12 +239,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
   // Reset password
   const resetPassword = async (email: string) => {
+    //console.log("AuthContext: resetPassword called for", email);
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/reset-password`,
       });
 
       if (error) {
+        console.error('AuthContext: resetPassword failed:', error);
         toast({
           variant: 'destructive',
           title: 'Password reset failed',
@@ -227,6 +254,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
         throw error;
       } else {
+        //console.log("AuthContext: Password reset email sent for", email);
         toast({
           title: 'Password reset email sent',
           description: 'Please check your email for password reset instructions.',
