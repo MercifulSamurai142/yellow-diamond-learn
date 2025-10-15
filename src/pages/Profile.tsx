@@ -9,8 +9,10 @@ import { useProfile, UserProfile } from "@/hooks/useProfile";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { useProgress } from "@/contexts/ProgressContext";
-import { LanguageContext } from "@/contexts/LanguageContext";
+import { LanguageContext, Language } from "@/contexts/LanguageContext"; // Import Language and useLanguage
 import { supabase } from "@/integrations/supabase/client";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"; // Import Select components
+
 
 // Translation object
 const translations = {
@@ -24,6 +26,7 @@ const translations = {
     region: "Region",
     state: "State",
     designation: "Designation",
+    language: "Language", // Added translation
     email: "Email",
     joined: "Joined",
     learningProgress: "Learning Progress",
@@ -56,6 +59,7 @@ const translations = {
     region: "क्षेत्र",
     state: "राज्य",
     designation: "पदनाम",
+    language: "भाषा", // Added translation
     email: "ईमेल",
     joined: "शामिल हुआ",
     learningProgress: "सीखने की प्रगति",
@@ -88,6 +92,7 @@ const translations = {
     region: "ಪ್ರದೇಶ",
     state: "ರಾಜ್ಯ",
     designation: "ಹುದ್ದೆ",
+    language: "ಭಾಷೆ", // Added translation
     email: "ಇಮೇಲ್",
     joined: "ಸೇರಿದರು",
     learningProgress: "ಕಲಿಕೆಯ ಪ್ರಗತಿ",
@@ -113,10 +118,10 @@ const translations = {
 };
 
 const Profile = () => {
-  const { profile, isLoading: isProfileLoading, updateProfile } = useProfile();
+  const { profile, isLoading: isProfileLoading, updateProfile } = useProfile(); // Removed refetchProfile destructuring
   const { user } = useAuth();
   const { progressStats, isLoading: isProgressLoadingStats } = useProgress();
-  const { currentLanguage } = useContext(LanguageContext)!;
+  const { currentLanguage, setLanguage } = useContext(LanguageContext)!; // Get setLanguage from LanguageContext
 
   const t = translations[currentLanguage] || translations.english;
 
@@ -128,6 +133,7 @@ const Profile = () => {
     psl_id: null,
     designation: "",
     state: "",
+    language: "english", // Initialize language
   });
 
   const [passwordData, setPasswordData] = useState({
@@ -141,27 +147,48 @@ const Profile = () => {
   const [isPasswordChanging, setIsPasswordChanging] = useState(false);
   const [isUploadingPicture, setIsUploadingPicture] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const lastPopulatedProfile = useRef<Partial<UserProfile> | null>(null); // To prevent infinite loop
 
   useEffect(() => {
     if (profile) {
-      setFormData(prev => ({
-        ...prev,
+      // Create a snapshot of the profile data that formData cares about
+      const profileSnapshot: Partial<UserProfile> = {
         name: profile.name || "",
-        email: profile.email || user?.email || "",
+        email: profile.email || "",
         role: profile.role || "learner",
         region: profile.region || "",
         psl_id: profile.psl_id || null,
         designation: profile.designation || "",
         state: profile.state || "",
-      }));
+        language: profile.language || "english",
+      };
+
+      // Only update formData if the profile snapshot is meaningfully different
+      // from what we last used to populate the form
+      if (JSON.stringify(profileSnapshot) !== JSON.stringify(lastPopulatedProfile.current)) {
+        setFormData(profileSnapshot);
+        lastPopulatedProfile.current = profileSnapshot; // Update the ref
+      }
     } else if (user && !profile) {
-       setFormData(prev => ({ ...prev, email: user.email || "" }));
+      // This branch is for when user is logged in but profile hasn't loaded or doesn't exist
+      // Only set email if it's different to prevent unnecessary renders
+      if (formData.email !== (user.email || "")) {
+        setFormData(prev => ({ ...prev, email: user.email || "" }));
+      }
+      // Since profile is null, reset lastPopulatedProfile
+      lastPopulatedProfile.current = null;
     }
-  }, [profile, user]);
+  }, [profile, user, formData.email]); // formData.email is added because it's set in the else-if branch
+                                      // and its change should trigger re-evaluation for that branch.
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
+    setFormData(prev => ({ ...prev, [name]: value })); // Corrected: `prev` is the formData itself.
+  };
+  
+  // New handler for language select
+  const handleLanguageSelectChange = (value: string) => {
+    setFormData(prev => ({ ...prev, language: value }));
   };
 
   const handlePasswordChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -288,18 +315,42 @@ const Profile = () => {
       if (formData.designation !== profile.designation) updateData.designation = formData.designation;
       if (formData.psl_id && formData.psl_id !== profile.psl_id) updateData.psl_id = formData.psl_id;
       if (formData.state !== profile.state) updateData.state = formData.state;
+      
+      const prevLanguage = profile.language;
+      const newLanguage = formData.language;
+      if (newLanguage && newLanguage !== prevLanguage) {
+          updateData.language = newLanguage; // Include language in update
+      }
 
       if (Object.keys(updateData).length === 0) {
         toast({ title: "No changes detected." });
         setUpdating(false);
         return;
       }
+
+      // Update the profile in the database
       const { error } = await updateProfile(updateData);
       if (error) throw error;
-      toast({
-        title: "Profile updated",
-        description: "Your profile information has been updated successfully.",
-      });
+
+      // If language was among the updated fields and it actually changed,
+      // update the global LanguageContext immediately.
+      // And then force a page reload.
+      if (updateData.language && updateData.language !== prevLanguage) {
+          setLanguage(updateData.language as Language); // Update global context immediately
+          toast({
+            title: "Language Updated",
+            description: `Your preferred language is now ${updateData.language}. Reloading page...`,
+          });
+          setTimeout(() => { // Give toast time to show before reloading
+            window.location.reload(); 
+          }, 1000);
+      } else {
+        toast({
+          title: "Profile updated",
+          description: "Your profile information has been updated successfully.",
+        });
+      }
+
     } catch (error) {
       console.error("Error updating profile:", error);
       toast({
@@ -600,7 +651,26 @@ const Profile = () => {
                           disabled
                         />
                       </div>
-                      <div className="space-y-2 md:col-span-2">
+                      <div className="space-y-2"> {/* Added Language field */}
+                        <label htmlFor="language" className="block text-sm font-medium text-foreground">
+                          {t.language}
+                        </label>
+                        <Select
+                          value={formData.language || 'english'}
+                          onValueChange={handleLanguageSelectChange}
+                          disabled={updating}
+                        >
+                          <SelectTrigger id="language" className="w-full">
+                            <SelectValue placeholder={t.language} />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="english">English</SelectItem>
+                            <SelectItem value="hindi">हिन्दी (Hindi)</SelectItem>
+                            <SelectItem value="kannada">ಕನ್ನಡ (Kannada)</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2 md:col-span-1"> {/* Adjusted grid span */}
                         <label htmlFor="region" className="block text-sm font-medium text-foreground">
                           {t.region}
                         </label>

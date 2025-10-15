@@ -1,19 +1,11 @@
 // yellow-diamond-learn-main/src/components/layout/Header.tsx
-import { Bell, Search, Languages } from "lucide-react"; // Import Languages icon
+import { Bell, Search } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useProfile } from "@/hooks/useProfile";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useContext } from 'react';
-import { LanguageContext, Language } from '@/contexts/LanguageContext';
-import { useNavigate } from "react-router-dom";
-// Import DropdownMenu components instead of Select
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Button } from "@/components/ui/button"; // Re-using existing Button component for the trigger
+import { LanguageContext } from '@/contexts/LanguageContext'; // Import LanguageContext
+// Removed DropdownMenu imports as language selection is moved to Profile page
 
 interface HeaderProps {
   className?: string;
@@ -22,15 +14,7 @@ interface HeaderProps {
 const Header = ({ className }: HeaderProps) => {
   const { profile } = useProfile();
   const isMobile = useIsMobile();
-  const { currentLanguage, setLanguage } = useContext(LanguageContext)!;
-  const navigate = useNavigate();
-
-  const handleLanguageChange = (lang: Language) => {
-    if (lang !== currentLanguage) {
-      setLanguage(lang);
-      navigate('/dashboard');
-    }
-  };
+  const { currentLanguage } = useContext(LanguageContext)!; // Get currentLanguage
 
   const mobileLeftPaddingClass = isMobile ? "pl-[60px]" : "pl-6";
 
@@ -67,30 +51,7 @@ const Header = ({ className }: HeaderProps) => {
       </div>
       
       <div className="flex items-center gap-4">
-        {/* Language Selector Dropdown Button */}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            {/* Use a compact icon button */}
-            <Button variant="outline" size="icon" className="relative rounded-full">
-              <Languages size={20} className="text-muted-foreground" />
-              {/* Optional: Small indicator for current language if desired, e.g., first letter */}
-              <span className="absolute bottom-0 right-0 text-[10px] bg-primary text-primary-foreground rounded-full h-4 w-4 flex items-center justify-center -mb-1 -mr-1">
-                {getLanguageLabel(currentLanguage).substring(0,1)}
-              </span>
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onClick={() => handleLanguageChange('english')}>
-              English
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleLanguageChange('hindi')}>
-              हिन्दी (Hindi)
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleLanguageChange('kannada')}>
-              ಕನ್ನಡ (Kannada)
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        {/* Language Selector Dropdown Button - REMOVED */}
 
         {/* <button className="relative rounded-full p-1 hover:bg-muted">
           <Bell size={20} className="text-muted-foreground" />
