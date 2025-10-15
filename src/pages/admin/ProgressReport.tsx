@@ -1,3 +1,4 @@
+// yellow-diamond-learn-dev/src/pages/admin/ProgressReport.tsx
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
@@ -7,6 +8,7 @@ import Header from '@/components/layout/Header';
 import Sidebar from '@/components/layout/Sidebar';
 import { YDCard } from '@/components/ui/YDCard';
 import { Progress } from '@/components/ui/progress';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, TooltipProps } from 'recharts';
 import { Loader2, User, ChevronRight, Download } from 'lucide-react';
 import YDButton from '@/components/ui/YDButton';
 import * as XLSX from 'xlsx';
@@ -27,6 +29,20 @@ type LanguageProgress = {
 type UserOverallProgress = {
   user: User;
   progress: LanguageProgress; 
+};
+
+// Custom Tooltip Component for Chart
+const CustomTooltip = ({ active, payload }: TooltipProps<number, string>) => {
+    if (active && payload && payload.length) {
+        const data = payload[0].payload;
+        return (
+            <div className="p-2 bg-background border rounded shadow-lg text-sm">
+                <p className="font-bold">{data.fullName}</p>
+                <p className="text-green-600">{`Score: ${payload[0].value}%`}</p>
+            </div>
+        );
+    }
+    return null;
 };
 
 const ProgressReport = () => {
@@ -147,7 +163,7 @@ const ProgressReport = () => {
             availableModulesForLanguage.forEach(module => {
                 (lessonsByModule.get(module.id) || []).forEach(lesson => {
                     // Ensure the lesson itself is also in the preferred language
-                    if (lesson.language === userPreferredLanguage) {
+                    if (lesson.language === userPreferredLanguage) { // <-- This ensures lessons match user's preferred language
                         availableLessonIdsForLanguage.add(lesson.id);
                     }
                 });
