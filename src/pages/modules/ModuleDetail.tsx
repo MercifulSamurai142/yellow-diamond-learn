@@ -5,7 +5,7 @@ import Header from "@/components/layout/Header";
 import Sidebar from "@/components/layout/Sidebar";
 import { YDCard } from "@/components/ui/YDCard";
 import YDButton from "@/components/ui/YDButton";
-import { ArrowLeft, BookOpen, Clock, ClipboardCheck, HelpCircle, Check, X, Loader2 } from "lucide-react";
+import { ArrowLeft, BookOpen, Clock, ClipboardCheck, HelpCircle, Check, X, Loader2, Lock } from "lucide-react"; // Import Lock icon
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
@@ -18,9 +18,10 @@ type Lesson = Tables<'lessons'>;
 type Quiz = Tables<'quizzes'>;
 type QuizResult = Tables<'quiz_results'>;
 
-// Combined type for state
+// Combined type for state - NOW INCLUDES is_completed
 type LessonWithQuizInfo = Lesson & {
   quiz: (Quiz & { attempt?: QuizResult | null }) | null;
+  is_completed: boolean; // Added completion status for the lesson
 };
 
 const ModuleDetail = () => {
@@ -77,6 +78,25 @@ const ModuleDetail = () => {
 
         const lessonIds = lessonData.map(l => l.id);
 
+        // --- Fetch User Progress for these lessons ---
+        let completedLessonIds = new Set<string>();
+        if (user) {
+          const { data: userProgressData, error: userProgressError } = await supabase
+            .from('user_progress')
+            .select('lesson_id')
+            .eq('user_id', user.id)
+            .in('lesson_id', lessonIds)
+            .eq('status', 'completed');
+
+          if (userProgressError) {
+              console.error("Error fetching user progress:", userProgressError);
+              toast({ variant: "destructive", title: "Warning", description: "Could not load your lesson progress." });
+          } else if (userProgressData) {
+              completedLessonIds = new Set(userProgressData.map(p => p.lesson_id));
+          }
+        }
+
+
         // --- Fetch Quizzes for these lessons ---
         let quizzesByLessonId = new Map<string, Quiz>();
         const { data: quizData, error: quizError } = await supabase
@@ -125,6 +145,7 @@ const ModuleDetail = () => {
           return {
             ...lesson,
             quiz: quiz ? { ...quiz, attempt } : null,
+            is_completed: completedLessonIds.has(lesson.id) // Set completion status
           };
         });
 
@@ -272,10 +293,23 @@ const ModuleDetail = () => {
                       </div>
                       <div className="pl-6 pt-1">
                           <Link to={`/modules/${moduleId}/lessons/${lesson.id}/quiz`}>
-                            <YDButton variant="outline" size="sm">
-                              {lesson.quiz.attempt ? 'Retake Quiz' : 'Take Quiz'}
+                            <YDButton 
+                              variant="outline" 
+                              size="sm"
+                              disabled={!lesson.is_completed} // Disable if lesson not completed
+                            >
+                              {lesson.is_completed ? (
+                                lesson.quiz.attempt ? 'Retake Quiz' : 'Take Quiz'
+                              ) : (
+                                <>
+                                  <Lock size={14} className="mr-1"/> Unlock Quiz
+                                </>
+                              )}
                             </YDButton>
                           </Link>
+                          {!lesson.is_completed && (
+                            <p className="text-xs text-red-500 mt-1">Complete the lesson to unlock the quiz.</p>
+                          )}
                       </div>
                     </div>
                   )}
