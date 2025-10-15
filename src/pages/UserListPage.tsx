@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import Header from "@/components/layout/Header";
 import Sidebar from "@/components/layout/Sidebar";
-import ProtectedRoute from "@/components/ProtectedRoute";
+// REMOVED: import ProtectedRoute from "@/components/ProtectedRoute"; // Protection is handled in App.tsx
 import UserManager from "@/components/admin/UserManager";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
@@ -60,39 +60,38 @@ const UserListPage = () => {
   };
 
   return (
-    <ProtectedRoute requiredRole="admin">
-      <div className="flex h-screen bg-background">
-        <Sidebar />
-        <div className="flex flex-col flex-1 overflow-hidden">
-          <Header />
-          <main className="flex-1 overflow-y-auto p-6">
-            <div className="yd-container animate-fade-in">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="yd-section-title">User Management</h2>
-                <YDButton onClick={loadData} disabled={isLoading}>
-                  {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
-                  {isLoading ? "Loading..." : "Refresh Data"}
-                </YDButton>
-              </div>
-              
-              {isLoading ? (
-                  <div className="flex items-center justify-center h-64">
-                      <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                  </div>
-              ) : (
-                <UserManager 
-                  users={users} 
-                  stagedUsers={stagedUsers}
-                  revokedUsers={revokedUsers}
-                  onUsersUpdate={setUsers} 
-                  refreshData={loadData} 
-                />
-              )}
+    // REMOVED: ProtectedRoute wrapper here. Protection is handled in App.tsx
+    <div className="flex h-screen bg-background">
+      <Sidebar />
+      <div className="flex flex-col flex-1 overflow-hidden">
+        <Header />
+        <main className="flex-1 overflow-y-auto p-6">
+          <div className="yd-container animate-fade-in">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="yd-section-title">User Management</h2>
+              <YDButton onClick={loadData} disabled={isLoading}>
+                {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                {isLoading ? "Loading..." : "Refresh Data"}
+              </YDButton>
             </div>
-          </main>
-        </div>
+            
+            {isLoading ? (
+                <div className="flex items-center justify-center h-64">
+                    <Loader2 className="h-12 w-12 animate-spin text-primary" />
+                </div>
+            ) : (
+              <UserManager 
+                users={users} 
+                stagedUsers={stagedUsers}
+                revokedUsers={revokedUsers}
+                onUsersUpdate={setUsers} 
+                refreshData={loadData} 
+              />
+            )}
+          </div>
+        </main>
       </div>
-    </ProtectedRoute>
+    </div>
   );
 };
 

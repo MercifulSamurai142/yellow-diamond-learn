@@ -12,7 +12,7 @@ import {
   X,
   LogOut,
   Megaphone,
-  Users,
+  Users, // Import Users icon
   BarChartHorizontal
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -85,14 +85,19 @@ const Sidebar = ({ className }: SidebarProps) => {
   const t = translations[currentLanguage] || translations.english;
 
   const isActive = (path: string) => {
-    return location.pathname.startsWith(path) && (path !== '/admin' || location.pathname === '/admin');
+    // Special handling for the base /admin path to match only it
+    if (path === '/admin') {
+      return location.pathname === '/admin';
+    }
+    // For other paths, match if the pathname starts with the item's path
+    return location.pathname.startsWith(path);
   };
 
   const navigationItems = [
     { name: t.dashboard, icon: <LayoutDashboard size={20} />, path: '/dashboard' },
     { name: t.modules, icon: <BookOpen size={20} />, path: '/modules' },
     { name: t.certificates, icon: <Award size={20} />, path: '/certificates' },
-    { name: t.announcements, icon: <Megaphone size={20} />, path: '/announcements' }, // Added back
+    { name: t.announcements, icon: <Megaphone size={20} />, path: '/announcements' },
     { name: t.progress, icon: <LineChart size={20} />, path: '/progress' },
     { name: t.profile, icon: <User size={20} />, path: '/profile' },
   ];
@@ -100,7 +105,7 @@ const Sidebar = ({ className }: SidebarProps) => {
   // Admin items would be conditionally displayed based on user role
   const adminItems = [
     { name: t.settings, icon: <Settings size={20} />, path: '/admin', roles: ['admin', 'region admin'] },
-    { name: t.userList, icon: <Users size={20} />, path: '/admin/users', roles: ['admin'] },
+    { name: t.userList, icon: <Users size={20} />, path: '/admin/users', roles: ['admin', 'region admin'] }, // Added 'region admin'
     { name: t.progressReport, icon: <BarChartHorizontal size={20} />, path: '/admin/progress-report', roles: ['admin', 'region admin'] },
   ];
 
@@ -208,7 +213,7 @@ const Sidebar = ({ className }: SidebarProps) => {
             <button className="fixed top-4 left-4 z-50 p-2 rounded-md bg-white border shadow-sm md:hidden">
               <Menu size={20} />
             </button>
-          </SheetTrigger>
+          </SheetTrigger> {/* CLOSING TAG ADDED HERE */}
           <SheetContent side="left" className="w-[240px] bg-sidebar p-0 [&>button]:hidden">
             {sidebarContent}
           </SheetContent>
