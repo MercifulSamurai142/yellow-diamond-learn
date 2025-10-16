@@ -1,3 +1,4 @@
+// yellow-diamond-learn-dev/src/components/admin/UserManager.tsx
 import { useState, useMemo } from "react";
 import { YDCard } from "@/components/ui/YDCard";
 import YDButton from "@/components/ui/YDButton";
@@ -18,6 +19,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import { useProfile } from "@/hooks/useProfile"; // Import useProfile
 
 interface UserManagerProps {
   users: UserProfile[];
@@ -30,6 +32,7 @@ interface UserManagerProps {
 const REGION_OPTIONS = ["North", "South", "East", "West", "Central"];
 
 const UserManager = ({ users, stagedUsers, revokedUsers, onUsersUpdate, refreshData }: UserManagerProps) => {
+  const { profile } = useProfile(); // Get current user's profile for role check
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [revokingUser, setRevokingUser] = useState<UserProfile | null>(null);
   const [unrevokingUser, setUnrevokingUser] = useState<UserProfile | null>(null);
@@ -51,42 +54,71 @@ const UserManager = ({ users, stagedUsers, revokedUsers, onUsersUpdate, refreshD
   const combinedAndFilteredUsers = useMemo(() => {
     let combined: any[] = [];
 
-    if (filter === 'revoked') {
-        combined = revokedUsers.map(ru => ({
-            ...ru,
-            id: ru.email, // Use email as unique key for rendering
-            status: 'revoked' as const,
-            isRevoked: true,
-            profile_picture: null
-        }));
-    } else {
-        const onboardedEmails = new Set(users.map(u => u.email));
+    // Create a temporary map to track unique entities by a generated key
+    const uniqueEntities = new Map<string, any>();
 
-        const onboarded = users.map(u => ({ 
+    // Process onboarded users
+    users.forEach(u => {
+        const key = `onboarded-${u.id}`; 
+        uniqueEntities.set(key, { 
           ...u, 
           status: 'onboarded' as const,
           isRevoked: u.email ? revokedEmailsSet.has(u.email) : false,
-        }));
+          __key: key // Add a specific key for React rendering
+        });
+    });
 
-        const notOnboarded = stagedUsers
-          .filter(su => su.email && !onboardedEmails.has(su.email))
-          .map(su => ({
-            ...su,
-            id: su.email!,
-            status: 'not onboarded' as const,
-            isRevoked: su.email ? revokedEmailsSet.has(su.email) : false,
-            role: su.role || 'learner',
-            profile_picture: null
-          }));
-        
-        if (filter === 'all') {
-            combined = [...onboarded, ...notOnboarded];
-        } else if (filter === 'onboarded') {
-            combined = onboarded;
-        } else { // not onboarded
-            combined = notOnboarded;
+    // Process not-onboarded (staged) users
+    stagedUsers.forEach(su => {
+        if (su.email) {
+            const key = `staged-${su.email}`;
+            // Only add if not already an onboarded user (email is the linking factor)
+            if (!users.some(u => u.email === su.email)) {
+                uniqueEntities.set(key, {
+                    ...su,
+                    id: su.email, // Use email as id for consistency in rendering, but prefix key
+                    status: 'not onboarded' as const,
+                    isRevoked: su.email ? revokedEmailsSet.has(su.email) : false,
+                    role: su.role || 'learner',
+                    profile_picture: null, // Staged users don't have profile pictures
+                    __key: key
+                });
+            }
+        }
+    });
+
+    // Process revoked users (these should override or be distinct)
+    revokedUsers.forEach(ru => {
+        if (ru.email) {
+            const key = `revoked-${ru.email}`;
+            // If a user is revoked, their entry in the revoked list takes precedence for display status
+            uniqueEntities.set(key, {
+                ...ru,
+                id: ru.email, // Use email as id for consistency in rendering, but prefix key
+                status: 'revoked' as const,
+                isRevoked: true, // Explicitly marked as revoked
+                profile_picture: null,
+                __key: key
+            });
+        }
+    });
+
+    // Convert map values to an array for filtering
+    combined = Array.from(uniqueEntities.values());
+
+
+    if (filter === 'revoked') {
+        combined = combined.filter(u => u.status === 'revoked');
+    } else {
+        // Filter out explicitly revoked users from 'onboarded' and 'not onboarded' views
+        combined = combined.filter(u => u.status !== 'revoked');
+        if (filter === 'onboarded') {
+            combined = combined.filter(u => u.status === 'onboarded');
+        } else if (filter === 'not onboarded') {
+            combined = combined.filter(u => u.status === 'not onboarded');
         }
     }
+
 
     if (!searchTerm) return combined;
 
@@ -100,17 +132,22 @@ const UserManager = ({ users, stagedUsers, revokedUsers, onUsersUpdate, refreshD
   }, [users, stagedUsers, revokedUsers, filter, searchTerm, revokedEmailsSet]);
 
   const handleEditUser = (userId: string) => {
-    const user = users.find(u => u.id === userId);
-    if (!user) return;
+    // Only admins can initiate an edit
+    if (profile?.role !== 'admin') {
+      toast({ title: "Permission Denied", description: "Only administrators can edit user profiles.", variant: "destructive" });
+      return;
+    }
+    const userToEdit = users.find(u => u.id === userId);
+    if (!userToEdit) return;
 
     setEditingUserId(userId);
     setEditUserData({
-      name: user.name || '',
-      email: user.email || '',
-      role: user.role,
-      designation: user.designation || '',
-      region: user.region || '',
-      state: user.state || ''
+      name: userToEdit.name || '',
+      email: userToEdit.email || '',
+      role: userToEdit.role,
+      designation: userToEdit.designation || '',
+      region: userToEdit.region || '',
+      state: userToEdit.state || ''
     });
   };
 
@@ -119,6 +156,12 @@ const UserManager = ({ users, stagedUsers, revokedUsers, onUsersUpdate, refreshD
   };
 
   const handleSaveUser = async (userId: string) => {
+    // Only admins can save user changes
+    if (profile?.role !== 'admin') {
+      toast({ title: "Permission Denied", description: "Only administrators can save user changes.", variant: "destructive" });
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from("users")
@@ -151,6 +194,12 @@ const UserManager = ({ users, stagedUsers, revokedUsers, onUsersUpdate, refreshD
   };
   
   const handleRevokeUser = async () => {
+    // Only admins can revoke users
+    if (profile?.role !== 'admin') {
+      toast({ title: "Permission Denied", description: "Only administrators can revoke users.", variant: "destructive" });
+      setRevokingUser(null);
+      return;
+    }
     if (!revokingUser) return;
     setIsRevoking(true);
     try {
@@ -184,6 +233,12 @@ const UserManager = ({ users, stagedUsers, revokedUsers, onUsersUpdate, refreshD
   };
   
   const handleUnrevokeUser = async () => {
+    // Only admins can unrevoke users
+    if (profile?.role !== 'admin') {
+      toast({ title: "Permission Denied", description: "Only administrators can unrevoke users.", variant: "destructive" });
+      setUnrevokingUser(null);
+      return;
+    }
     if (!unrevokingUser) return;
     setIsUnrevoking(true);
     try {
@@ -212,6 +267,8 @@ const UserManager = ({ users, stagedUsers, revokedUsers, onUsersUpdate, refreshD
       setUnrevokingUser(null);
     }
   };
+
+  const isAdmin = profile?.role === 'admin';
 
   return (
     <div>
@@ -250,7 +307,7 @@ const UserManager = ({ users, stagedUsers, revokedUsers, onUsersUpdate, refreshD
           </YDCard>
         ) : (
           combinedAndFilteredUsers.map((user) => (
-            <YDCard key={user.id} className="p-4">
+            <YDCard key={user.__key} className="p-4"> {/* Use __key for React's key prop */}
               <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-4 w-full">
                   <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary flex-shrink-0">
@@ -312,7 +369,7 @@ const UserManager = ({ users, stagedUsers, revokedUsers, onUsersUpdate, refreshD
                 </div>
                 
                 <div className="flex gap-2">
-                  {editingUserId !== user.id && (
+                  {editingUserId !== user.id && isAdmin && ( // Only admins see edit/revoke/unrevoke buttons
                     <>
                       {user.status === 'onboarded' && !user.isRevoked && (
                           <>

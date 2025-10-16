@@ -1,5 +1,5 @@
 // yellow-diamond-learn-dev/src/pages/Onboarding.tsx
-import { useState, useEffect, useContext } from "react";
+import { useState, useEffect, useContext, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { Loader2, Save } from "lucide-react";
 import YDButton from "@/components/ui/YDButton";
@@ -37,9 +37,10 @@ const translations = {
     notFoundTitle: "No Onboarding Data Found",
     notFoundDescription: "Your user data for onboarding could not be found. Please contact an administrator.",
     errorFetching: "Failed to load your onboarding data. Please try again.",
-    updateSuccess: "Profile updated successfully! Redirecting...",
+    updateSuccess: "Profile updated successfully!",
     languageUpdate: "Language updated. Reloading page...",
-    updateFailed: "Failed to update profile. Please try again."
+    updateFailed: "Failed to update profile. Please try again.",
+    redirecting: "Redirecting..."
   },
   hindi: {
     welcome: "यलो डायमंड एकेडमी में आपका स्वागत है!",
@@ -59,9 +60,10 @@ const translations = {
     notFoundTitle: "कोई ऑनबोर्डिंग डेटा नहीं मिला",
     notFoundDescription: "आपकी ऑनबोर्डिंग के लिए उपयोगकर्ता डेटा नहीं मिला। कृपया एक व्यवस्थापक से संपर्क करें।",
     errorFetching: "आपका ऑनबोर्डिंग डेटा लोड करने में विफल। कृपया पुनः प्रयास करें।",
-    updateSuccess: "प्रोफ़ाइल सफलतापूर्वक अपडेट किया गया! रीडायरेक्ट कर रहा है...",
+    updateSuccess: "प्रोफ़ाइल सफलतापूर्वक अपडेट किया गया!",
     languageUpdate: "भाषा अपडेट की गई। पृष्ठ पुनः लोड हो रहा है...",
-    updateFailed: "प्रोफ़ाइल अपडेट करने में विफल। कृपया पुनः प्रयास करें।"
+    updateFailed: "प्रोफ़ाइल अपडेट करने में विफल। कृपया पुनः प्रयास करें।",
+    redirecting: "रीडायरेक्ट कर रहा है..."
   },
   kannada: {
     welcome: "ಯೆಲ್ಲೊ ಡೈಮಂಡ್ ಅಕಾಡೆಮಿಗೆ ಸ್ವಾಗತ!",
@@ -81,9 +83,10 @@ const translations = {
     notFoundTitle: "ಯಾವುದೇ ಆನ್‌ಬೋರ್ಡಿಂಗ್ ಡೇಟಾ ಕಂಡುಬಂದಿಲ್ಲ",
     notFoundDescription: "ಆನ್‌ಬೋರ್ಡಿಂಗ್‌ಗಾಗಿ ನಿಮ್ಮ ಬಳಕೆದಾರ ಡೇಟಾ ಕಂಡುಬಂದಿಲ್ಲ. ದಯವಿಟ್ಟು ನಿರ್ವಾಹಕರನ್ನು ಸಂಪರ್ಕಿಸಿ.",
     errorFetching: "ನಿಮ್ಮ ಆನ್‌ಬೋರ್ಡಿಂಗ್ ಡೇಟಾವನ್ನು ಲೋಡ್ ಮಾಡಲು ವಿಫಲವಾಗಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
-    updateSuccess: "ಪ್ರೊಫೈಲ್ ಅನ್ನು ಯಶಸ್ವಿಯಾಗಿ ನವೀಕರಿಸಲಾಗಿದೆ! ಮರುನಿರ್ದೇಶಿಸಲಾಗುತ್ತಿದೆ...",
+    updateSuccess: "ಪ್ರೊಫೈಲ್ ಅನ್ನು ಯಶಸ್ವಿಯಾಗಿ ನವೀಕರಿಸಲಾಗಿದೆ!",
     languageUpdate: "ಭಾಷೆ ನವೀಕರಿಸಲಾಗಿದೆ. ಪುಟವನ್ನು ಮರುಲೋಡ್ ಮಾಡಲಾಗುತ್ತಿದೆ...",
-    updateFailed: "ಪ್ರೊಫೈಲ್ ನವೀಕರಿಸಲು ವಿಫಲವಾಗಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ."
+    updateFailed: "ಪ್ರೊಫೈಲ್ ನವೀಕರಿಸಲು ವಿಫಲವಾಗಿದೆ. ದಯವಿಟ್ಟು ಮತ್ತೆ ಪ್ರಯತ್ನಿಸಿ.",
+    redirecting: "ಮರುನಿರ್ದೇಶಿಸಲಾಗುತ್ತಿದೆ..."
   }
 };
 
@@ -108,35 +111,42 @@ const Onboarding = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [hasStagingData, setHasStagingData] = useState(false);
+  const isMounted = useRef(true); // To track if component is mounted
+
+  useEffect(() => {
+    return () => {
+      isMounted.current = false; // Mark component as unmounted
+    };
+  }, []);
 
   // Redirect if PSL ID is already present or profile is still loading
   useEffect(() => {
-    if (isProfileLoading) return;
+    if (isProfileLoading || !isMounted.current) return;
 
     if (profile && profile.psl_id) {
-      toast({ title: "Profile already complete.", description: "Redirecting to dashboard." });
+      toast({ title: "Profile already complete.", description: t.redirecting });
       navigate('/dashboard', { replace: true });
     } else if (user) {
       fetchStagingAndProfileData();
     } else {
-      // If no user, redirect to login (shouldn't happen with ProtectedRoute, but as a fallback)
       navigate('/login', { replace: true });
     }
-  }, [isProfileLoading, profile, user, navigate]);
+  }, [isProfileLoading, profile, user, navigate, t.redirecting]);
 
   const fetchStagingAndProfileData = async () => {
-    if (!user?.email) {
+    if (!user?.email || !isMounted.current) {
       setIsLoading(false);
       return;
     }
     setIsLoading(true);
     try {
-      // Fetch staging data
       const { data: stagingData, error: stagingError } = await supabase
         .from('user_import_staging')
         .select('psl_id, name, designation, region, state, role')
         .eq('email', user.email)
         .single();
+
+      if (!isMounted.current) return; // Exit if unmounted
 
       if (stagingError) {
         if (stagingError.code === 'PGRST116') { // No rows found
@@ -147,30 +157,33 @@ const Onboarding = () => {
         }
       } else {
         setHasStagingData(true);
-        // Combine with existing profile data (email, id from auth.users, and any existing profile fields)
         setFormData(prev => ({
-          ...prev, // Keep existing fields from initial state or prior renders
-          id: user.id, // Ensure user ID from auth.users is used
-          email: user.email!, // Ensure email from auth.users is used
-          role: stagingData.role || profile?.role || 'learner', // Prioritize staging, then existing profile, then default
+          ...prev,
+          id: user.id,
+          email: user.email!,
+          role: stagingData.role || profile?.role || 'learner',
           psl_id: stagingData.psl_id,
           name: stagingData.name || profile?.name || user.email?.split('@')[0] || '',
           designation: stagingData.designation || profile?.designation || '',
           region: stagingData.region || profile?.region || '',
           state: stagingData.state || profile?.state || '',
-          language: profile?.language || 'english', // Keep existing language or default
+          language: profile?.language || 'english',
         }));
       }
     } catch (error: any) {
       console.error("Error fetching onboarding data:", error);
-      toast({ variant: "destructive", title: t.errorFetching, description: error.message });
-      setHasStagingData(false); // Mark as no staging data fetched
+      if (isMounted.current) {
+        toast({ variant: "destructive", title: t.errorFetching, description: error.message });
+        setHasStagingData(false);
+      }
     } finally {
-      setIsLoading(false);
+      if (isMounted.current) {
+        setIsLoading(false);
+      }
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => { // Changed type to HTMLInputElement
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
   };
@@ -197,8 +210,8 @@ const Onboarding = () => {
 
     try {
       const updateData: Partial<UserProfile> = {
-        id: user.id, // Ensure we update the correct user
-        email: user.email!, // Ensure email is correctly set
+        id: user.id,
+        email: user.email!,
         psl_id: formData.psl_id,
         name: formData.name,
         designation: formData.designation,
@@ -206,34 +219,40 @@ const Onboarding = () => {
         state: formData.state,
         role: formData.role,
         language: formData.language,
-        updated_at: new Date().toISOString(), // Mark as updated
+        updated_at: new Date().toISOString(),
       };
 
-      // Attempt to update the user's profile in the 'users' table
       const { data, error } = await updateProfile(updateData);
 
       if (error) throw error;
 
-      // Update global language context
+      toast({ title: t.updateSuccess, description: t.redirecting });
+
+      // Update global language context if changed
       if (formData.language && formData.language !== currentLanguage) {
         setLanguage(formData.language as Language);
-        toast({ title: t.languageUpdate, description: "Please wait for the page to reload." });
-        setTimeout(() => { 
-          window.location.reload(); 
-        }, 500); // Small delay for reload to ensure language context is fully set
-      } else {
-        toast({ title: t.updateSuccess });
-        // Add a small delay to ensure profile state propagates through ProtectedRoute
+        // Force a full page reload to apply language changes across the app
+        // This is necessary because some components might not re-render deeply enough
+        // or rely on initial load for font registration in PDF generation.
         setTimeout(() => {
-          navigate('/dashboard', { replace: true });
-        }, 100); 
+          if (isMounted.current) window.location.reload();
+        }, 100); // Short delay to allow toast to show
+      } else {
+        // Just navigate if only profile data (other than language) was updated
+        setTimeout(() => {
+          if (isMounted.current) navigate('/dashboard', { replace: true });
+        }, 100); // Short delay for smooth navigation
       }
 
     } catch (error: any) {
       console.error("Onboarding submission error:", error);
-      toast({ variant: "destructive", title: t.updateFailed, description: error.message });
+      if (isMounted.current) {
+        toast({ variant: "destructive", title: t.updateFailed, description: error.message });
+      }
     } finally {
-      setIsSubmitting(false);
+      if (isMounted.current) {
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -246,7 +265,6 @@ const Onboarding = () => {
     );
   }
 
-  // If no staging data was found and we're not loading, show an error message
   if (!hasStagingData && !isLoading) {
     return (
         <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -277,8 +295,8 @@ const Onboarding = () => {
                 name="psl_id"
                 type="text"
                 value={formData.psl_id || ''}
-                readOnly // Use readOnly instead of disabled
-                className="bg-white" // Override potential gray background from disabled
+                readOnly
+                className="bg-white"
               />
             </div>
             <div className="space-y-2">
@@ -288,8 +306,8 @@ const Onboarding = () => {
                 name="designation"
                 type="text"
                 value={formData.designation || ''}
-                readOnly // Use readOnly instead of disabled
-                className="bg-white" // Override potential gray background from disabled
+                readOnly
+                className="bg-white"
               />
             </div>
             <div className="space-y-2">
@@ -299,9 +317,8 @@ const Onboarding = () => {
                 name="name"
                 type="text"
                 value={formData.name || ''}
-                readOnly // Use readOnly instead of disabled
-                className="bg-white" // Override potential gray background from disabled
-                // No onChange as it's read-only
+                readOnly
+                className="bg-white"
               />
             </div>
             <div className="space-y-2">
@@ -311,8 +328,8 @@ const Onboarding = () => {
                 name="email"
                 type="email"
                 value={formData.email || ''}
-                readOnly // Use readOnly instead of disabled
-                className="bg-white" // Override potential gray background from disabled
+                readOnly
+                className="bg-white"
               />
             </div>
             <div className="space-y-2">
@@ -322,8 +339,8 @@ const Onboarding = () => {
                 name="role"
                 type="text"
                 value={formData.role || 'learner'}
-                readOnly // Use readOnly instead of disabled
-                className="bg-white" // Override potential gray background from disabled
+                readOnly
+                className="bg-white"
               />
             </div>
             <div className="space-y-2">
@@ -333,8 +350,8 @@ const Onboarding = () => {
                 name="state"
                 type="text"
                 value={formData.state || ''}
-                readOnly // Use readOnly instead of disabled
-                className="bg-white" // Override potential gray background from disabled
+                readOnly
+                className="bg-white"
               />
             </div>
             <div className="space-y-2">
@@ -344,15 +361,16 @@ const Onboarding = () => {
                 name="region"
                 type="text"
                 value={formData.region || ''}
-                readOnly // Use readOnly instead of disabled
-                className="bg-white" // Override potential gray background from disabled
+                readOnly
+                className="bg-white"
               />
             </div>
             <div className="space-y-2">
               <Label htmlFor="language">{t.language}</Label>
               <Select
                 value={formData.language || 'english'}
-                onValueChange={handleLanguageSelectChange} // This remains editable
+                onValueChange={handleLanguageSelectChange}
+                disabled={isSubmitting}
               >
                 <SelectTrigger id="language">
                   <SelectValue placeholder={t.language} />
