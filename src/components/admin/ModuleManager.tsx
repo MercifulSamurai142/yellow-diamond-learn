@@ -1,4 +1,5 @@
-import React, { useState } from "react";
+// yellow-diamond-learn-dev/src/components/admin/ModuleManager.tsx
+import React, { useState, useEffect } from "react";
 import { YDCard } from "@/components/ui/YDCard";
 import YDButton from "@/components/ui/YDButton";
 import { supabase } from "@/integrations/supabase/client";
@@ -11,18 +12,20 @@ import { Pencil, Trash2, Plus, Loader2, X } from "lucide-react";
 import { Module, ModuleDesignation, ModuleRegion } from "@/pages/Admin";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from "@/components/ui/command";
 
 interface ModuleManagerProps {
   modules: Module[];
   moduleDesignations: ModuleDesignation[];
   moduleRegions: ModuleRegion[];
+  englishModules: Module[]; // List of all English modules for reference
   onModulesUpdate: (modules: Module[]) => void;
   refreshData: () => Promise<void>;
 }
 
 const REGION_OPTIONS = ["North", "South", "East", "West", "Central"];
 
-const ModuleManager = ({ modules, moduleDesignations, moduleRegions, onModulesUpdate, refreshData }: ModuleManagerProps) => {
+const ModuleManager = ({ modules, moduleDesignations, moduleRegions, englishModules, onModulesUpdate, refreshData }: ModuleManagerProps) => {
   const [isAddingModule, setIsAddingModule] = useState(false);
   const [editingModuleId, setEditingModuleId] = useState<string | null>(null);
   const [newModule, setNewModule] = useState({
@@ -31,6 +34,7 @@ const ModuleManager = ({ modules, moduleDesignations, moduleRegions, onModulesUp
     order: 1,
     video_url: null as string | null,
     language: 'english',
+    reference_module_id: null as string | null,
   });
   const [designations, setDesignations] = useState<string[]>([]);
   const [designationInput, setDesignationInput] = useState("");
@@ -39,6 +43,20 @@ const ModuleManager = ({ modules, moduleDesignations, moduleRegions, onModulesUp
   const [isUploading, setIsUploading] = useState(false);
   const [availableVideos, setAvailableVideos] = useState<{ name: string }[]>([]);
   const [isListingVideos, setIsListingVideos] = useState(false);
+  const [referenceSearchQuery, setReferenceSearchQuery] = useState('');
+  const [isReferenceSelectOpen, setIsReferenceSelectOpen] = useState(false);
+
+  useEffect(() => {
+    console.log("ModuleManager mounted/updated. Initial englishModules:", englishModules);
+  }, [englishModules]);
+
+
+  const t = {
+    referenceModule: "Reference Module",
+    selectReferenceModule: "Select a reference English module",
+    searchModules: "Search modules...",
+    noModulesFound: "No modules found.",
+  };
 
   const handleVideoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     if (e.target.files?.[0]) {
@@ -66,21 +84,18 @@ const ModuleManager = ({ modules, moduleDesignations, moduleRegions, onModulesUp
   };
 
   const saveModuleDependencies = async (moduleId: string) => {
-    // Delete existing designations and regions for this module
     const { error: deleteDesignationError } = await supabase.from('module_designation').delete().eq('module_id', moduleId);
     if (deleteDesignationError) throw deleteDesignationError;
     
     const { error: deleteRegionError } = await supabase.from('module_region').delete().eq('module_id', moduleId);
     if (deleteRegionError) throw deleteRegionError;
 
-    // Insert new designations
     if (designations.length > 0) {
       const designationInserts = designations.map(d => ({ module_id: moduleId, designation: d }));
       const { error: insertDesignationError } = await supabase.from('module_designation').insert(designationInserts);
       if (insertDesignationError) throw insertDesignationError;
     }
 
-    // Insert new regions
     if (regions.length > 0) {
       const regionInserts = regions.map(r => ({ module_id: moduleId, region: r }));
       const { error: insertRegionError } = await supabase.from('module_region').insert(regionInserts);
@@ -96,7 +111,13 @@ const ModuleManager = ({ modules, moduleDesignations, moduleRegions, onModulesUp
       }
 
       const { data: moduleData, error: moduleError } = await supabase
-        .from("modules").insert({ ...newModule, video_url: null }).select().single();
+        .from("modules").insert({ 
+          ...newModule, 
+          video_url: null,
+          reference_module_id: newModule.reference_module_id,
+        })
+        .select()
+        .single();
 
       if (moduleError) throw moduleError;
       if (!moduleData) throw new Error("Failed to create module.");
@@ -141,6 +162,7 @@ const ModuleManager = ({ modules, moduleDesignations, moduleRegions, onModulesUp
       order: moduleToEdit.order,
       video_url: moduleToEdit.video_url || null,
       language: moduleToEdit.language || "english",
+      reference_module_id: moduleToEdit.reference_module_id || null,
     });
     
     const currentDesignations = moduleDesignations.filter(md => md.module_id === moduleId).map(md => md.designation);
@@ -176,7 +198,14 @@ const ModuleManager = ({ modules, moduleDesignations, moduleRegions, onModulesUp
       }
 
       const { data: updatedModule, error } = await supabase
-        .from("modules").update({ ...newModule, video_url: finalVideoUrl }).eq("id", editingModuleId).select().single();
+        .from("modules").update({ 
+          ...newModule, 
+          video_url: finalVideoUrl,
+          reference_module_id: newModule.reference_module_id,
+        })
+        .eq("id", editingModuleId)
+        .select()
+        .single();
 
       if (error) throw error;
       
@@ -193,15 +222,37 @@ const ModuleManager = ({ modules, moduleDesignations, moduleRegions, onModulesUp
 
   const handleDeleteModule = async (moduleId: string) => {
     try {
-      await supabase.storage.from('module-videos').remove([`public/${moduleId}`]);
+      // Delete associated module_designation and module_region records first due to foreign key constraints
+      await supabase.from('module_designation').delete().eq('module_id', moduleId);
+      await supabase.from('module_region').delete().eq('module_id', moduleId);
+
+      // Attempt to delete associated video from storage bucket
+      try {
+        const { data: fileList, error: listError } = await supabase.storage
+          .from('module-videos')
+          .list(`public/${moduleId}`);
+
+        if (listError) throw listError;
+
+        if (fileList && fileList.length > 0) {
+          const filesToDelete = fileList.map(file => `public/${moduleId}/${file.name}`);
+          const { error: storageError } = await supabase.storage
+            .from('module-videos')
+            .remove(filesToDelete);
+          if (storageError) console.error("Error deleting module videos from storage:", storageError);
+        }
+      } catch (storageOpError) {
+        console.warn("Could not delete module videos from storage. Continuing with DB deletion:", storageOpError);
+      }
+      
       const { error } = await supabase.from("modules").delete().eq("id", moduleId);
       if (error) throw error;
 
       toast({ title: "Success", description: "Module deleted successfully" });
       await refreshData();
-    } catch (error) {
+    } catch (error: any) {
       console.error("Error deleting module:", error);
-      toast({ variant: "destructive", title: "Error", description: "Failed to delete module. Make sure there are no lessons attached to this module." });
+      toast({ variant: "destructive", title: "Error", description: `Failed to delete module: ${error.message}. Make sure there are no lessons attached to this module.` });
     }
   };
   
@@ -222,13 +273,31 @@ const ModuleManager = ({ modules, moduleDesignations, moduleRegions, onModulesUp
   const cancelModuleAction = () => {
     setIsAddingModule(false);
     setEditingModuleId(null);
-    setNewModule({ name: "", description: "", order: modules.length + 1, video_url: null, language: 'english' });
+    setNewModule({ 
+      name: "", 
+      description: "", 
+      order: modules.length + 1, 
+      video_url: null, 
+      language: 'english',
+      reference_module_id: null,
+    });
     setDesignations([]);
     setDesignationInput("");
     setRegions([]);
     setVideoFile(null);
     setIsUploading(false);
+    setReferenceSearchQuery('');
+    setIsReferenceSelectOpen(false);
   };
+
+  // Pre-filter modules based on search query
+  const filteredEnglishModules = englishModules.filter(m => {
+    const moduleNameLower = m.name.toLowerCase();
+    const searchQueryLower = referenceSearchQuery.toLowerCase();
+    const isMatch = moduleNameLower.includes(searchQueryLower);
+    console.log(`Filtering: Module Name: "${moduleNameLower}", Search Query: "${searchQueryLower}", Includes: ${isMatch}`);
+    return isMatch;
+  });
 
   return (
     <div>
@@ -237,7 +306,14 @@ const ModuleManager = ({ modules, moduleDesignations, moduleRegions, onModulesUp
         {!isAddingModule && (
           <YDButton onClick={() => {
             setIsAddingModule(true);
-            setNewModule({ name: "", description: "", order: modules.length + 1, video_url: null, language: 'english' });
+            setNewModule({ // Reset to default when adding new
+              name: "",
+              description: "",
+              order: modules.length + 1,
+              video_url: null,
+              language: 'english',
+              reference_module_id: null,
+            });
           }}>
             <Plus size={16} className="mr-2" /> Add Module
           </YDButton>
@@ -248,14 +324,14 @@ const ModuleManager = ({ modules, moduleDesignations, moduleRegions, onModulesUp
         <YDCard className="p-6 mb-6">
           <h4 className="text-lg font-medium mb-4">{editingModuleId ? "Edit Module" : "Add New Module"}</h4>
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
                 <Label>Module Name</Label>
                 <Input value={newModule.name} onChange={(e) => setNewModule({ ...newModule, name: e.target.value })} placeholder="Enter module name" />
               </div>
               <div>
                 <Label>Module Language</Label>
-                <Select value={newModule.language} onValueChange={(value) => setNewModule({ ...newModule, language: value })}>
+                <Select value={newModule.language} onValueChange={(value) => setNewModule({ ...newModule, language: value, reference_module_id: value === 'english' ? null : newModule.reference_module_id })}>
                   <SelectTrigger><SelectValue placeholder="Language" /></SelectTrigger>
                   <SelectContent>
                     <SelectItem value="english">English</SelectItem>
@@ -265,6 +341,60 @@ const ModuleManager = ({ modules, moduleDesignations, moduleRegions, onModulesUp
                 </Select>
               </div>
             </div>
+            
+            {/* Reference Module Dropdown */}
+            {newModule.language !== "english" && (
+                <div className="space-y-2">
+                    <Label htmlFor="referenceModule">{t.referenceModule}</Label>
+                    <Select
+                        open={isReferenceSelectOpen}
+                        onOpenChange={setIsReferenceSelectOpen}
+                        value={newModule.reference_module_id || ""}
+                        onValueChange={(value) => {
+                            setNewModule({ ...newModule, reference_module_id: value });
+                            setIsReferenceSelectOpen(false);
+                        }}
+                        disabled={newModule.language === "english"}
+                    >
+                        <SelectTrigger id="referenceModule">
+                            <SelectValue placeholder={t.selectReferenceModule}>
+                                {newModule.reference_module_id
+                                    ? englishModules.find(m => m.id === newModule.reference_module_id)?.name || t.selectReferenceModule
+                                    : t.selectReferenceModule}
+                            </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent>
+                            <Command>
+                                <CommandInput placeholder={t.searchModules} value={referenceSearchQuery} onValueChange={setReferenceSearchQuery} />
+                                <CommandList>
+                                    {/* Conditional rendering of CommandEmpty based on filteredEnglishModules */}
+                                    {filteredEnglishModules.length === 0 ? (
+                                        <CommandEmpty>{t.noModulesFound}</CommandEmpty>
+                                    ) : (
+                                        filteredEnglishModules.map((module) => (
+                                            <CommandItem
+                                                key={module.id}
+                                                value={module.id}
+                                                onSelect={(currentValue) => {
+                                                    setNewModule(prev => ({
+                                                        ...prev,
+                                                        reference_module_id: currentValue === prev.reference_module_id ? null : currentValue,
+                                                    }));
+                                                    setReferenceSearchQuery("");
+                                                    setIsReferenceSelectOpen(false);
+                                                }}
+                                            >
+                                                {module.name}
+                                            </CommandItem>
+                                        ))
+                                    )}
+                                </CommandList>
+                            </Command>
+                        </SelectContent>
+                    </Select>
+                </div>
+            )}
+
             <div>
               <Label htmlFor="moduleDescription">Description</Label>
               <Textarea id="moduleDescription" value={newModule.description} onChange={(e) => setNewModule({ ...newModule, description: e.target.value })} placeholder="Enter module description" rows={3} />
@@ -341,6 +471,11 @@ const ModuleManager = ({ modules, moduleDesignations, moduleRegions, onModulesUp
                     <div className="flex items-center">
                       <span className="inline-flex items-center justify-center w-6 h-6 text-xs font-semibold bg-primary/20 text-primary rounded-full mr-2">{module.order}</span>
                       <h4 className="text-lg font-medium">{module.name}</h4>
+                      {module.language !== 'english' && module.reference_module_id && (
+                        <span className="ml-2 text-xs px-2 py-1 rounded bg-blue-100 text-blue-800">
+                          Ref: {englishModules.find(m => m.id === module.reference_module_id)?.name || 'Unknown'}
+                        </span>
+                      )}
                     </div>
                     <p className="text-muted-foreground mt-1">{module.description}</p>
                   </div>

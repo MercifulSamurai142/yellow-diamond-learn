@@ -122,16 +122,16 @@ const AppContent = () => {
         </ProtectedRoute>
       } />
       <Route path="/admin" element={
-        <ProtectedRoute requiredRole={['admin', 'region admin']}>
+        <ProtectedRoute requiredRole={['admin']}>
           <Admin />
         </ProtectedRoute>
       } />
-      <Route path="/admin/users" element={
+      <Route path="/users" element={
         <ProtectedRoute requiredRole={['admin', 'region admin']}> {/* Updated: Allow region admins */}
           <UserListPage />
         </ProtectedRoute>
       } />
-      <Route path="/admin/progress-report" element={
+      <Route path="/progress-report" element={
         <ProtectedRoute requiredRole={['admin', 'region admin']}>
           <ProgressReport />
         </ProtectedRoute>
