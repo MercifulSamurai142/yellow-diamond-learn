@@ -131,7 +131,7 @@ const AppContent = () => {
           <UserListPage />
         </ProtectedRoute>
       } />
-      <Route path="/admin/progress-report" element={
+      <Route path="/progress-report" element={
         <ProtectedRoute requiredRole={['admin', 'region admin']}>
           <ProgressReport />
         </ProtectedRoute>
