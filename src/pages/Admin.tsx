@@ -1,3 +1,4 @@
+// yellow-diamond-learn-dev/src/pages/Admin.tsx
 import { useState, useEffect } from "react";
 import Header from "@/components/layout/Header";
 import Sidebar from "@/components/layout/Sidebar";
@@ -13,7 +14,10 @@ import { Tables } from "@/integrations/supabase/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
 
-export type Module = Tables<"modules">;
+// Update Module type to include reference_module_id
+export type Module = Tables<"modules"> & {
+  reference_module_id?: string | null; // Reverted to reference_module_id
+};
 export type Lesson = Tables<"lessons">;
 export type Quiz = Tables<"quizzes">;
 export type Question = Tables<"questions">;
@@ -36,6 +40,7 @@ const Admin = () => {
   const [announcements, setAnnouncements] = useState<Announcement[]>([]);
   const [moduleDesignations, setModuleDesignations] = useState<ModuleDesignation[]>([]);
   const [moduleRegions, setModuleRegions] = useState<ModuleRegion[]>([]);
+  const [allEnglishModules, setAllEnglishModules] = useState<Module[]>([]); // New state for English modules
 
   useEffect(() => {
     if (profile) {
@@ -99,12 +104,22 @@ const Admin = () => {
       setAnnouncements(announcementsData || []);
 
       const { data: designationsData, error: designationsError } = await supabase.from("module_designation").select("*");
-      if (designationsError) throw designationsError;
+      if (designationsError) throw designationsData;
       setModuleDesignations(designationsData || []);
       
       const { data: regionsData, error: regionsError } = await supabase.from("module_region").select("*");
       if (regionsError) throw regionsError;
       setModuleRegions(regionsData || []);
+
+      // Fetch all English modules for the reference dropdown
+      const { data: engModulesData, error: engModulesError } = await supabase
+        .from("modules")
+        .select("*")
+        .eq("language", "english")
+        .order("name");
+      if (engModulesError) throw engModulesError;
+      setAllEnglishModules(engModulesData || []);
+
 
     } catch (error) {
       console.error("Error loading admin data:", error);
@@ -145,6 +160,7 @@ const Admin = () => {
                     modules={modules} 
                     moduleDesignations={moduleDesignations}
                     moduleRegions={moduleRegions}
+                    englishModules={allEnglishModules} // Pass new prop here
                     onModulesUpdate={setModules} 
                     refreshData={loadData} 
                   />
