@@ -236,6 +236,29 @@ export type Database = {
           }
         ]
       }
+      module_state: {
+        Row: {
+          module_id: string
+          state: string
+        }
+        Insert: {
+          module_id: string
+          state: string
+        }
+        Update: {
+          module_id?: string
+          state?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "module_state_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "modules"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       modules_completed: {
         Row: {
           id: string
