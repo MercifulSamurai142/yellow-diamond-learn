@@ -1,6 +1,6 @@
-// yellow-diamond-learn-main/src/pages/modules/ModuleDetail.tsx
+// yellow-diamond-learn-dev/src/pages/modules/ModuleDetail.tsx
 import { useEffect, useState, useContext } from "react"; // Import useContext
-import { Link, useParams } from "react-router-dom";
+import { Link, useParams, useNavigate } from "react-router-dom";
 import Header from "@/components/layout/Header";
 import Sidebar from "@/components/layout/Sidebar";
 import { YDCard } from "@/components/ui/YDCard";
@@ -11,6 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { toast } from "@/hooks/use-toast";
 import { Tables } from "@/integrations/supabase/types";
 import { LanguageContext } from '@/contexts/LanguageContext'; // Import LanguageContext
+import { useProfile } from "@/hooks/useProfile"; // Import useProfile
 
 // Define necessary types using Supabase Tables helper or manually
 type Module = Tables<'modules'>;
@@ -31,6 +32,8 @@ const ModuleDetail = () => {
   const [lessons, setLessons] = useState<LessonWithQuizInfo[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const { user } = useAuth();
+  const { profile, isLoading: isProfileLoading } = useProfile(); // Get user profile
+  const navigate = useNavigate();
   const { currentLanguage } = useContext(LanguageContext)!; // Get currentLanguage
 
   useEffect(() => {
@@ -39,7 +42,9 @@ const ModuleDetail = () => {
       setLessons([]); // Clear previous lessons on new fetch
       setModule(null);
       try {
-        if (!moduleId) throw new Error("Module ID is missing from URL parameters.");
+        if (!moduleId || !user || !profile) { // Ensure user and profile are loaded
+            throw new Error("Missing user, profile, or Module ID from URL parameters.");
+        }
 
         // Fetch module details
         const { data: moduleData, error: moduleError } = await supabase
@@ -48,7 +53,13 @@ const ModuleDetail = () => {
           .eq('id', moduleId)
           .single();
 
-        if (moduleError) throw moduleError;
+        if (moduleError) {
+            console.error("Module fetch error:", moduleError);
+            if (moduleError.code === 'PGRST116') { // Code for "No rows found"
+                 throw new Error(`Module with ID ${moduleId} not found.`);
+            }
+            throw moduleError;
+        }
         if (!moduleData) throw new Error(`Module with ID ${moduleId} not found.`);
 
         // Additionally check if the module's language matches the current selected language.
@@ -56,6 +67,45 @@ const ModuleDetail = () => {
         if (moduleData?.language && moduleData.language !== currentLanguage) {
              console.warn(`Module ${moduleId} is in ${moduleData.language}, but current language is ${currentLanguage}. Displaying module anyway but filtering lessons.`);
         }
+
+        // --- Authorization Check (State-based) ---
+        let isAuthorized = false;
+        if (profile.role === 'admin') {
+            isAuthorized = true;
+        } else {
+            const { data: moduleDesignations, error: desError } = await supabase
+                .from('module_designation')
+                .select('designation')
+                .eq('module_id', moduleId);
+            if (desError) throw desError;
+            const designations = moduleDesignations?.map(md => md.designation) || [];
+            const isDesignationRestricted = designations.length > 0;
+
+            // Fetch module_state data
+            const { data: moduleStates, error: stateError } = await supabase
+                .from('module_state')
+                .select('state')
+                .eq('module_id', moduleId);
+            if (stateError) throw stateError;
+            const states = moduleStates?.map(ms => ms.state) || [];
+            const isStateRestricted = states.length > 0;
+
+            // If module has no restrictions, non-admins cannot access it directly by link
+            if (!isDesignationRestricted && !isStateRestricted) {
+                isAuthorized = false;
+            } else {
+                const userMatchesDesignation = !isDesignationRestricted || (!!profile.designation && designations.includes(profile.designation));
+                const userMatchesState = !isStateRestricted || (!!profile.state && states.includes(profile.state));
+                isAuthorized = userMatchesDesignation && userMatchesState;
+            }
+        }
+
+        if (!isAuthorized) {
+            toast({ variant: "destructive", title: "Access Denied", description: "You do not have permission to view this module." });
+            navigate('/modules', { replace: true });
+            return;
+        }
+        // --- End Authorization Check ---
 
         setModule(moduleData); // Set module state
 
@@ -161,16 +211,16 @@ const ModuleDetail = () => {
       }
     };
 
-    if (moduleId) {
+    if (user && profile && !isProfileLoading) {
       fetchModuleAndLessons();
-    } else {
-         setIsLoading(false);
-         toast({ variant: "destructive", title: "Error", description: "Module ID not found." });
+    } else if (!user || (!isProfileLoading && !profile)) {
+      // If no user or profile loaded, redirect
+      navigate('/login', { replace: true });
     }
-  }, [moduleId, user, currentLanguage]); // Add currentLanguage to dependencies
+  }, [moduleId, user, profile, isProfileLoading, navigate, currentLanguage]); // Add currentLanguage to dependencies
 
   // --- Loading State ---
-  if (isLoading) {
+  if (isLoading || isProfileLoading) {
     return (
       <div className="flex h-screen bg-background">
         <Sidebar />

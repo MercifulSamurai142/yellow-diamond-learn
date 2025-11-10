@@ -48,7 +48,7 @@ const CustomTooltip = ({ active, payload }: TooltipProps<number, string>) => {
 const ProgressReport = () => {
   const [userProgressList, setUserProgressList] = useState<UserOverallProgress[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isDownloading, setIsDownloading] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false); // New state for download button
 
   useEffect(() => {
     const fetchAllProgressData = async () => {
@@ -59,7 +59,8 @@ const ProgressReport = () => {
           { data: usersData, error: usersError },
           { data: modulesData, error: modulesError },
           { data: designationsData, error: designationsError },
-          { data: regionsData, error: regionsError },
+          // Fetch module_state data instead of module_region
+          { data: statesData, error: statesError }, 
           { data: lessonsData, error: lessonsError }, // This fetch needs all fields for type Lesson
           { data: progressData, error: progressError },
           { data: quizzesData, error: quizzesError },
@@ -68,7 +69,8 @@ const ProgressReport = () => {
           supabase.from('users').select('*').order('name'),
           supabase.from('modules').select('id, language'),
           supabase.from('module_designation').select('*'),
-          supabase.from('module_region').select('*'),
+          // Fetch module_state data
+          supabase.from('module_state').select('*'), 
           // FIX: Select all fields for the lessons to match the Lesson type
           supabase.from('lessons').select('id, module_id, language, content, created_at, duration_minutes, order, title, updated_at, video_url'), 
           supabase.from('user_progress').select('user_id, lesson_id').eq('status', 'completed'),
@@ -79,7 +81,7 @@ const ProgressReport = () => {
         if (usersError) throw usersError;
         if (modulesError) throw modulesError;
         if (designationsError) throw designationsError;
-        if (regionsError) throw regionsError;
+        if (statesError) throw statesError; // Check for error in statesData
         if (lessonsError) throw lessonsError;
         if (progressError) throw progressError;
         if (quizzesError) throw quizzesError;
@@ -94,10 +96,11 @@ const ProgressReport = () => {
             designationsMap.get(md.module_id)!.push(md.designation);
         });
 
-        const regionsMap = new Map<string, string[]>();
-        regionsData!.forEach(mr => {
-            if (!regionsMap.has(mr.module_id)) regionsMap.set(mr.module_id, []);
-            regionsMap.get(mr.module_id)!.push(mr.region);
+        // Use statesMap instead of regionsMap
+        const statesMap = new Map<string, string[]>();
+        statesData!.forEach(ms => {
+            if (!statesMap.has(ms.module_id)) statesMap.set(ms.module_id, []);
+            statesMap.get(ms.module_id)!.push(ms.state);
         });
         
         const lessonsByModule = new Map<string, Lesson[]>(); // Store full lesson objects
@@ -142,21 +145,21 @@ const ProgressReport = () => {
                 if (user.role === 'admin') return true;
 
                 const designations = designationsMap.get(module.id) || [];
-                const regions = regionsMap.get(module.id) || [];
+                const states = statesMap.get(module.id) || []; // Use states
                 
                 const isDesignationRestricted = designations.length > 0;
-                const isRegionRestricted = regions.length > 0;
+                const isStateRestricted = states.length > 0; // Use state restriction
 
                 // If a module has no restrictions, it is NOT shown to non-admins
-                if (!isDesignationRestricted && !isRegionRestricted && user.role !== 'admin') {
+                if (!isDesignationRestricted && !isStateRestricted && user.role !== 'admin') {
                     return false; 
                 }
 
                 // If it is restricted, the user must match all active restrictions.
                 const userMatchesDesignation = !isDesignationRestricted || (!!user.designation && designations.includes(user.designation));
-                const userMatchesRegion = !isRegionRestricted || (!!user.region && regions.includes(user.region));
+                const userMatchesState = !isStateRestricted || (!!user.state && states.includes(user.state)); // Check user's state
 
-                return userMatchesDesignation && userMatchesRegion;
+                return userMatchesDesignation && userMatchesState;
             });
             
             const availableLessonIdsForLanguage = new Set<string>();
@@ -237,7 +240,8 @@ const ProgressReport = () => {
                 "Email": user.email,
                 "PSL ID": user.psl_id || 'N/A',
                 "Role": user.role || 'N/A',
-                "Region": user.region || 'N/A',
+                "Region": user.region || 'N/A', // Keep region for now, as it's in user profile
+                "State": user.state || 'N/A', // Added State
                 "Preferred Language": user.language || 'english', // Explicitly show preferred language
                 "Total Lessons (Preferred Lang)": progress.total,
                 "Lessons Completed (Preferred Lang)": progress.completed,
@@ -265,6 +269,7 @@ const ProgressReport = () => {
             { wch: 15 }, // PSL ID
             { wch: 15 }, // Role
             { wch: 15 }, // Region
+            { wch: 15 }, // State (Added column)
             { wch: 20 }, // Preferred Language
             { wch: 30 }, // Total Lessons (Preferred Lang)
             { wch: 30 }, // Lessons Completed (Preferred Lang)

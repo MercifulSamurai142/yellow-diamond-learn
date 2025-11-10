@@ -1,4 +1,4 @@
-// yellow-diamond-learn-main/src/pages/Progress.tsx
+// yellow-diamond-learn-dev/src/pages/Progress.tsx
 import { useEffect, useState, useContext } from "react";
 import Header from "@/components/layout/Header";
 import Sidebar from "@/components/layout/Sidebar";
@@ -196,31 +196,32 @@ const ProgressPage = () => {
                         designationsMap.get(md.module_id)!.push(md.designation);
                     }
 
-                    const { data: moduleRegions, error: regError } = await supabase.from('module_region').select('module_id, region').in('module_id', moduleIds);
-                    if (regError) throw regError;
-                    const regionsMap = new Map<string, string[]>();
-                    for (const mr of moduleRegions) {
-                        if (!regionsMap.has(mr.module_id)) regionsMap.set(mr.module_id, []);
-                        regionsMap.get(mr.module_id)!.push(mr.region);
+                    // Fetch module_state data
+                    const { data: moduleStates, error: stateError } = await supabase.from('module_state').select('module_id, state').in('module_id', moduleIds);
+                    if (stateError) throw stateError;
+                    const statesMap = new Map<string, string[]>();
+                    for (const ms of moduleStates) {
+                        if (!statesMap.has(ms.module_id)) statesMap.set(ms.module_id, []);
+                        statesMap.get(ms.module_id)!.push(ms.state);
                     }
 
                     const userDesignation = profile.designation;
-                    const userRegion = profile.region;
+                    const userState = profile.state; // Use user's state
 
                     filteredModules = modulesData.filter(module => {
                         const designations = designationsMap.get(module.id) || [];
-                        const regions = regionsMap.get(module.id) || [];
+                        const states = statesMap.get(module.id) || []; // Use states
                         const isDesignationRestricted = designations.length > 0;
-                        const isRegionRestricted = regions.length > 0;
+                        const isStateRestricted = states.length > 0; // Use state restriction
 
-                        if (!isDesignationRestricted && !isRegionRestricted) {
+                        if (!isDesignationRestricted && !isStateRestricted) {
                             return false; 
                         }
 
                         const userMatchesDesignation = !isDesignationRestricted || (!!userDesignation && designations.includes(userDesignation));
-                        const userMatchesRegion = !isRegionRestricted || (!!userRegion && regions.includes(userRegion));
+                        const userMatchesState = !isStateRestricted || (!!userState && states.includes(userState)); // Check user's state
 
-                        return userMatchesDesignation && userMatchesRegion;
+                        return userMatchesDesignation && userMatchesState;
                     });
                 }
             }
@@ -383,7 +384,7 @@ const ProgressPage = () => {
                   <YDCard>
                       <div className="p-4">
                         <div className="flex items-center mb-4">
-                          <PieChart className="h-5 w-5 mr-2 text-green-500" />
+                          <BarChart3 className="h-5 w-5 mr-2 text-green-500" />
                           <h3 className="font-medium">{t.quizPerformanceByModule}</h3>
                         </div>
                         <div className="h-48">

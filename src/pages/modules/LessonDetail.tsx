@@ -1,3 +1,5 @@
+
+// yellow-diamond-learn-dev/src/pages/modules/LessonDetail.tsx
 // yellow-diamond-learn-main/src/pages/modules/LessonDetail.tsx
 import { useEffect, useState, useContext } from "react";
 import { Link, useParams, useNavigate } from "react-router-dom";
@@ -15,6 +17,7 @@ import { CheckContext } from "@/services/achivementServices";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { cn } from "@/lib/utils";
 import { LanguageContext } from '@/contexts/LanguageContext'; // Import LanguageContext
+import { useProfile } from "@/hooks/useProfile"; // Import useProfile
 
 type Lesson = Tables<"lessons">
 
@@ -31,6 +34,7 @@ const LessonDetail = () => {
   const [progress, setProgress] = useState<UserProgress | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const { user } = useAuth();
+  const { profile, isLoading: isProfileLoading } = useProfile(); // Get user profile
   const navigate = useNavigate();
   const isMobile = useIsMobile();
   const { currentLanguage } = useContext(LanguageContext)!; // Get currentLanguage
@@ -106,11 +110,68 @@ const LessonDetail = () => {
       setIsLoading(true);
 
       try {
-        if (!lessonId || !moduleId) {
-            throw new Error("Missing Module ID or Lesson ID");
+        if (!lessonId || !moduleId || !user || !profile) {
+            throw new Error("Missing user, profile, Module ID or Lesson ID");
         };
 
-        // Fetch lesson details
+        // Fetch module details first for authorization check
+        const { data: moduleData, error: moduleError } = await supabase
+          .from('modules')
+          .select('*')
+          .eq('id', moduleId)
+          .single();
+
+        if (moduleError) {
+            console.error("Module fetch error:", moduleError);
+            if (moduleError.code === 'PGRST116') {
+                 throw new Error(`Module with ID ${moduleId} not found.`);
+            }
+            throw moduleError;
+        }
+        if (!moduleData) throw new Error(`Module with ID ${moduleId} not found.`);
+
+        // --- Authorization Check (State-based) ---
+        let isAuthorized = false;
+        if (profile.role === 'admin') {
+            isAuthorized = true;
+        } else {
+            const { data: moduleDesignations, error: desError } = await supabase
+                .from('module_designation')
+                .select('designation')
+                .eq('module_id', moduleId);
+            if (desError) throw desError;
+            const designations = moduleDesignations?.map(md => md.designation) || [];
+            const isDesignationRestricted = designations.length > 0;
+
+            // Fetch module_state data
+            const { data: moduleStates, error: stateError } = await supabase
+                .from('module_state')
+                .select('state')
+                .eq('module_id', moduleId);
+            if (stateError) throw stateError;
+            const states = moduleStates?.map(ms => ms.state) || [];
+            const isStateRestricted = states.length > 0;
+
+            // If module has no restrictions, non-admins cannot access it directly by link
+            if (!isDesignationRestricted && !isStateRestricted) {
+                isAuthorized = false;
+            } else {
+                const userMatchesDesignation = !isDesignationRestricted || (!!profile.designation && designations.includes(profile.designation));
+                const userMatchesState = !isStateRestricted || (!!profile.state && states.includes(profile.state));
+                isAuthorized = userMatchesDesignation && userMatchesState;
+            }
+        }
+
+        if (!isAuthorized) {
+            toast({ variant: "destructive", title: "Access Denied", description: "You do not have permission to view this module." });
+            navigate('/modules', { replace: true });
+            return;
+        }
+        // --- End Authorization Check ---
+
+        setModule(moduleData as Module);
+
+        // Fetch lesson details (only if authorized)
         const { data: lessonData, error: lessonError } = await supabase
           .from('lessons')
           .select('*')
@@ -137,18 +198,6 @@ const LessonDetail = () => {
         if (isNaN(currentOrder)) {
           throw new Error(`Invalid order type for current lesson: ${typeof lessonData.order}`);
         }
-
-        // Fetch module details
-        const { data: moduleData, error: moduleError } = await supabase
-          .from('modules')
-          .select('id, name')
-          .eq('id', moduleId)
-          .single();
-
-        if (moduleError) throw moduleError;
-        if (!moduleData) throw new Error(`Module with ID ${moduleId} not found.`);
-
-        setModule(moduleData as Module);
 
         // Check for quiz
         const { count: quizCount, error: quizError } = await supabase
@@ -209,11 +258,16 @@ const LessonDetail = () => {
       }
     };
 
-    fetchLessonData();
+    if (user && profile && !isProfileLoading) {
+      fetchLessonData();
+    } else if (!user || (!isProfileLoading && !profile)) {
+      // If no user or profile loaded, redirect
+      navigate('/login', { replace: true });
+    }
 
-  }, [lessonId, moduleId, user, navigate, currentLanguage]);
+  }, [lessonId, moduleId, user, profile, isProfileLoading, navigate, currentLanguage]);
 
-  if (isLoading) {
+  if (isLoading || isProfileLoading) {
     return (
       <div className="flex h-screen bg-background">
         <Sidebar />
