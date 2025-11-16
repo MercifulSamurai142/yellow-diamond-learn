@@ -13,7 +13,8 @@ import {
   LogOut,
   Megaphone,
   Users, // Import Users icon
-  BarChartHorizontal
+  BarChartHorizontal,
+  MapPin // Import MapPin icon for Region Admins
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -45,13 +46,33 @@ const Sidebar = ({ className }: SidebarProps) => {
       announcements: "Announcements",
       progress: "Progress",
       profile: "Profile",
-      settings: "Settings",
+      settings: "Admin Settings", // Renamed for clarity
       admin: "Admin",
       logout: "Logout",
       userList: "User List",
-      progressReport: "Progress Report"
+      progressReport: "Progress Report",
+      regionAdmins: "Region Admins" // New translation
     },
     hindi: {
+      title: "घोषणाएँ",
+      subtitle: "नवीनतम समाचारों और दस्तावेजों से अपडेट रहें।",
+      viewDocument: "अटैचमेंट डाउनलोड करें",
+      noAnnouncements: "इस भाषा में अभी तक कोई घोषणा पोस्ट नहीं की गई है। कृपया बाद में फिर से देखें।",
+      errorTitle: "त्रुटि",
+      errorDescription: "घोषणाएँ लोड नहीं हो सकीं。",
+      welcomeTitle: "यलो डायमंड एकेडमी में आपका स्वागत है",
+      welcomeSubtitle: "अपनी प्रगति को ट्रैक करें और अपनी सीखने की यात्रा जारी रखें",
+      courseProgress: "कोर्स प्रगति",
+      modulesCompleted: "मॉड्यूल पूर्ण",
+      yourModules: "आपके मॉड्यूल",
+      viewAllModules: "सभी मॉड्यूल देखें",
+      lessons: "पाठ",
+      complete: "पूर्ण",
+      startModule: "शुरू करें",
+      continueModule: "जारी रखें",
+      reviewModule: "समीक्षा",
+      module: "मॉड्यूल",
+      noModulesAvailable: "चयनित भाषा के लिए कोई मॉड्यूल उपलब्ध नहीं है।",
       companyName: "यलो डायमंड",
       dashboard: "डैशबोर्ड",
       modules: "मॉड्यूल",
@@ -59,13 +80,33 @@ const Sidebar = ({ className }: SidebarProps) => {
       announcements: "घोषणाएँ",
       progress: "प्रगति",
       profile: "प्रोफाइल",
-      settings: "सेटिंग्स",
+      settings: "एडमिन सेटिंग्स",
       admin: "एडमिन",
       logout: "लॉग आउट",
       userList: "उपयोगकर्ता सूची",
-      progressReport: "प्रगति रिपोर्ट"
+      progressReport: "प्रगति रिपोर्ट",
+      regionAdmins: "क्षेत्रीय एडमिन" // New translation
     },
     kannada: {
+      title: "ಪ್ರಕಟಣೆಗಳು",
+      subtitle: "ಇತ್ತೀಚಿನ ಸುದ್ದಿಗಳು ಮತ್ತು ದಾಖಲೆಗಳೊಂದಿಗೆ ನವೀಕೃತವಾಗಿರಿ.",
+      viewDocument: "ಲಗತ್ತನ್ನು ಡೌನ್‌ಲೋಡ್ ಮಾಡಿ",
+      noAnnouncements: "ಈ ಭಾಷೆಯಲ್ಲಿ ಯಾವುದೇ ಪ್ರಕಟಣೆಗಳನ್ನು ಇನ್ನೂ ಪೋಸ್ಟ್ ಮಾಡಲಾಗಿಲ್ಲ. ದಯವಿಟ್ಟು ನಂತರ ಮತ್ತೆ ಪರಿಶೀಲಿಸಿ.",
+      errorTitle: "ದೋಷ",
+      errorDescription: "ಪ್ರಕಟಣೆಗಳನ್ನು ಲೋಡ್ ಮಾಡಲು ಸಾಧ್ಯವಾಗಲಿಲ್ಲ.",
+      welcomeTitle: "ಯೆಲ್ಲೊ ಡೈಮಂಡ್ ಅಕಾಡೆಮಿಗೆ ಸ್ವಾಗತ",
+      welcomeSubtitle: "ನಿಮ್ಮ ಪ್ರಗತಿಯನ್ನು ಟ್ರ್ಯಾಕ್ ಮಾಡಿ ಮತ್ತು ನಿಮ್ಮ ಕಲಿಕೆಯ ಪ್ರಯಾಣವನ್ನು ಮುಂದುವರಿಸಿ",
+      courseProgress: "ಕೋರ್ಸ್ ಪ್ರಗತಿ",
+      modulesCompleted: "ಮಾಡ್ಯೂಲ್‌ಗಳು ಪೂರ್ಣಗೊಂಡಿವೆ",
+      yourModules: "ನಿಮ್ಮ ಮಾಡ್ಯೂಲ್‌ಗಳು",
+      viewAllModules: "ಎಲ್ಲಾ ಮಾಡ್ಯೂಲ್‌ಗಳನ್ನು ವೀಕ್ಷಿಸಿ",
+      lessons: "ಪಾಠಗಳು",
+      complete: "ಪೂರ್ಣ",
+      startModule: "ಪ್ರಾರಂಭಿಸಿ",
+      continueModule: "ಮುಂದುವರಿಸಿ",
+      reviewModule: "ಪರಿಶೀಲನೆ",
+      module: "ಮಾಡ್ಯೂಲ್",
+      noModulesAvailable: "ಆಯ್ಕೆಮಾಡಿದ ಭಾಷೆಗಾಗಿ ಯಾವುದೇ ಮಾಡ್ಯೂಲ್‌ಗಳು ಲಭ್ಯವಿಲ್ಲ.",
       companyName: "ಯೆಲ್ಲೊ ಡೈಮಂಡ್",
       dashboard: "ಡ್ಯಾಶ್‌ಬೋರ್ಡ್",
       modules: "ಮಾಡ್ಯೂಲ್‌ಗಳು",
@@ -73,11 +114,12 @@ const Sidebar = ({ className }: SidebarProps) => {
       announcements: "ಪ್ರಕಟಣೆಗಳು",
       progress: "ಪ್ರಗತಿ",
       profile: "ಪ್ರೊಫೈಲ್",
-      settings: "ಸೆಟ್ಟಿಂಗ್‌ಗಳು",
-      admin: "ಆಡ್ಮಿನ್",
+      settings: "ನಿರ್ವಾಹಕ ಸೆಟ್ಟಿಂಗ್‌ಗಳು",
+      admin: "ನಿರ್ವಾಹಕ",
       logout: "ಲಾಗ್ ಔಟ್",
       userList: "ಬಳಕೆದಾರರ ಪಟ್ಟಿ",
-      progressReport: "ಪ್ರಗತಿ ವರದಿ"
+      progressReport: "ಪ್ರಗತಿ ವರದಿ",
+      regionAdmins: "ಪ್ರಾದೇಶಿಕ ನಿರ್ವಾಹಕರು" // New translation
     }
   };
 
@@ -105,8 +147,9 @@ const Sidebar = ({ className }: SidebarProps) => {
   // Admin items would be conditionally displayed based on user role
   const adminItems = [
     { name: t.settings, icon: <Settings size={20} />, path: '/admin', roles: ['admin'] },
-    { name: t.userList, icon: <Users size={20} />, path: '/users', roles: ['admin', 'region admin'] }, // Added 'region admin'
+    { name: t.userList, icon: <Users size={20} />, path: '/users', roles: ['admin', 'region admin'] },
     { name: t.progressReport, icon: <BarChartHorizontal size={20} />, path: '/progress-report', roles: ['admin', 'region admin'] },
+    { name: t.regionAdmins, icon: <MapPin size={20} />, path: '/admin/region-admins', roles: ['admin'] }, // New item for RegionAdminManager
   ];
 
   const sidebarContent = (

@@ -112,23 +112,58 @@ const Dashboard = () => {
       try {
         setIsListLoading(true);
 
-        // Fetch modules filtered by currentLanguage
-        const { data: modulesData, error: modulesError } = await supabase
+        let modulesQuery = supabase
           .from('modules')
           .select('*')
-          .eq('language', currentLanguage) // Apply language filter
+          .eq('language', currentLanguage)
           .order('order');
 
-        if (modulesError) throw modulesError;
-        if (!modulesData) {
-          setModules([]);
-          setIsListLoading(false);
-          return;
+        let authorizedStates: string[] = [];
+        if (profile.role === 'region admin' && profile.id) {
+            const { data: adminStatesData, error: adminStatesError } = await supabase
+                .from('region_admin_state')
+                .select('state')
+                .eq('id', profile.id);
+            if (adminStatesError) throw adminStatesError;
+            authorizedStates = adminStatesData.map(row => row.state);
+
+            if (authorizedStates.length === 0) {
+                // If region admin has no states assigned, they see no modules.
+                setModules([]);
+                setIsListLoading(false);
+                return;
+            }
         }
 
-        let finalModules = modulesData;
+        const { data: modulesData, error: modulesError } = await modulesQuery;
+        if (modulesError) throw modulesError;
+        
+        let filteredModules = modulesData || [];
 
-        if (profile.role !== 'admin') {
+        if (profile.role === 'admin') {
+            // Admin sees all modules for the selected language, no further filtering needed
+        } else if (profile.role === 'region admin') {
+            // Region admin sees modules mapped to their assigned states
+            const { data: moduleStates, error: stateError } = await supabase.from('module_state').select('module_id, state');
+            if (stateError) throw stateError;
+            const statesMap = new Map<string, string[]>();
+            for (const ms of moduleStates) {
+                if (!statesMap.has(ms.module_id)) statesMap.set(ms.module_id, []);
+                statesMap.get(ms.module_id)!.push(ms.state);
+            }
+
+            filteredModules = filteredModules.filter(module => {
+                const moduleStates = statesMap.get(module.id) || [];
+                const isModuleStateRestricted = moduleStates.length > 0;
+
+                if (!isModuleStateRestricted) {
+                    return false; // Modules with no state restriction are not shown to region admins (unless specifically allowed later)
+                }
+
+                // Check if *any* of the module's states are in the region admin's authorized states
+                return moduleStates.some(ms => authorizedStates.includes(ms));
+            });
+        } else { // Learner role
             const { data: moduleDesignations, error: desError } = await supabase.from('module_designation').select('module_id, designation');
             if (desError) throw desError;
             const designationsMap = new Map<string, string[]>();
@@ -137,7 +172,6 @@ const Dashboard = () => {
                 designationsMap.get(md.module_id)!.push(md.designation);
             }
 
-            // Fetch module_state data instead of module_region
             const { data: moduleStates, error: stateError } = await supabase.from('module_state').select('module_id, state');
             if (stateError) throw stateError;
             const statesMap = new Map<string, string[]>();
@@ -147,38 +181,36 @@ const Dashboard = () => {
             }
 
             const userDesignation = profile.designation;
-            const userState = profile.state; // Use user's state
+            const userState = profile.state;
 
-            finalModules = modulesData.filter(module => {
+            filteredModules = filteredModules.filter(module => {
                 const designations = designationsMap.get(module.id) || [];
-                const states = statesMap.get(module.id) || []; // Use states
+                const states = statesMap.get(module.id) || [];
                 
                 const isDesignationRestricted = designations.length > 0;
-                const isStateRestricted = states.length > 0; // Use state restriction
+                const isStateRestricted = states.length > 0;
 
-                // If a module has no restrictions, it is NOT shown to non-admins.
                 if (!isDesignationRestricted && !isStateRestricted) {
                     return false; 
                 }
 
-                // If it is restricted, the user must match all active restrictions.
                 const userMatchesDesignation = !isDesignationRestricted || (!!userDesignation && designations.includes(userDesignation));
-                const userMatchesState = !isStateRestricted || (!!userState && states.includes(userState)); // Check user's state
+                const userMatchesState = !isStateRestricted || (!!userState && states.includes(userState));
 
                 return userMatchesDesignation && userMatchesState;
             });
         }
 
-
         // Fetch all lessons (also filtered by language to match modules)
+        const moduleIds = filteredModules.map(m => m.id);
         const { data: allLessonsData, error: lessonsError } = await supabase
            .from('lessons')
            .select('id, module_id')
-           .eq('language', currentLanguage); // Filter lessons by language
+           .in('module_id', moduleIds) // Filter lessons by filtered modules
+           .eq('language', currentLanguage);
 
         if (lessonsError) throw lessonsError;
-        // Don't throw fatal if no lessons, calculations will handle it.
-
+        
         // Fetch completed progress items for the user (not language specific)
         const { data: progressData, error: progressError } = await supabase
           .from('user_progress')
@@ -192,7 +224,7 @@ const Dashboard = () => {
 
 
         // Map modules to include progress and status for display
-        const modulesWithProgress = finalModules.map((module) => {
+        const modulesWithProgress = filteredModules.map((module) => {
             const lessonsInModule = (allLessonsData || []).filter(l => l.module_id === module.id);
             const lessonCount = lessonsInModule.length;
             const completedLessonsInModule = lessonsInModule.filter(l => completedLessonIds.has(l.id)).length;

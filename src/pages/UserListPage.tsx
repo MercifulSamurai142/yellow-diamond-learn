@@ -1,3 +1,4 @@
+// yellow-diamond-learn-dev/src/pages/UserListPage.tsx
 import { useState, useEffect, useMemo } from "react";
 import Header from "@/components/layout/Header";
 import Sidebar from "@/components/layout/Sidebar";
@@ -6,49 +7,80 @@ import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { Tables } from "@/integrations/supabase/types";
 import YDButton from "@/components/ui/YDButton";
-import { Loader2, Download } from "lucide-react"; // Import Download icon
-import * as XLSX from 'xlsx'; // Import XLSX library
+import { Loader2, Download } from "lucide-react";
+import * as XLSX from 'xlsx';
+import { useProfile } from "@/hooks/useProfile"; // Import useProfile
 
 export type UserProfile = Tables<"users">;
 export type StagedUser = Tables<"user_import_staging">;
 export type RevokedUser = Tables<"revoked_users">;
 
-const REGION_OPTIONS = ["North", "South", "East", "West", "Central"]; // Re-define or import if needed for download logic
-
 const UserListPage = () => {
+  const { profile, isLoading: isProfileLoading } = useProfile(); // Get current user's profile
   const [users, setUsers] = useState<UserProfile[]>([]);
   const [stagedUsers, setStagedUsers] = useState<StagedUser[]>([]);
   const [revokedUsers, setRevokedUsers] = useState<RevokedUser[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false); // New state for download button
+  const [isDownloading, setIsDownloading] = useState(false);
 
   useEffect(() => {
+    if (isProfileLoading) {
+        return; // Wait for profile to load
+    }
     loadData();
-  }, []);
+  }, [profile, isProfileLoading]); // Re-run when profile changes
 
   const loadData = async () => {
     setIsLoading(true);
     try {
-      const { data: usersData, error: usersError } = await supabase
-        .from("users")
-        .select("*")
-        .order("email");
+      let usersQuery = supabase.from("users").select("*");
+      let stagedUsersQuery = supabase.from("user_import_staging").select("*");
+
+      let authorizedStates: string[] = [];
+      if (profile?.role === 'region admin' && profile.id) {
+          const { data: adminStatesData, error: adminStatesError } = await supabase
+              .from('region_admin_state')
+              .select('state')
+              .eq('id', profile.id);
+          if (adminStatesError) throw adminStatesError;
+          authorizedStates = adminStatesData.map(row => row.state);
+      }
+
+      if (profile?.role === 'region admin' && authorizedStates.length > 0) {
+          usersQuery = usersQuery.in('state', authorizedStates);
+          stagedUsersQuery = stagedUsersQuery.in('state', authorizedStates);
+      } else if (profile?.role === 'region admin' && authorizedStates.length === 0) {
+          // If region admin but no states assigned, they see no users.
+          setUsers([]);
+          setStagedUsers([]);
+          setRevokedUsers([]); // Also show no revoked users
+          setIsLoading(false);
+          return;
+      }
+
+      const [{ data: usersData, error: usersError },
+        { data: stagedUsersData, error: stagedUsersError },
+        { data: revokedUsersData, error: revokedUsersError }
+      ] = await Promise.all([
+        usersQuery.order("email"),
+        stagedUsersQuery.order("email"),
+        supabase.from("revoked_users").select("*").order("timestamp", { ascending: false }),
+      ]);
+
       if (usersError) throw usersError;
       setUsers(usersData || []);
 
-      const { data: stagedUsersData, error: stagedUsersError } = await supabase
-        .from("user_import_staging")
-        .select("*")
-        .order("email");
       if (stagedUsersError) throw stagedUsersError;
       setStagedUsers(stagedUsersData || []);
 
-      const { data: revokedUsersData, error: revokedUsersError } = await supabase
-        .from("revoked_users")
-        .select("*")
-        .order("timestamp", { ascending: false });
       if (revokedUsersError) throw revokedUsersError;
-      setRevokedUsers(revokedUsersData || []);
+      // Filter revoked users if the current user is a region admin with assigned states
+      if (profile?.role === 'region admin' && authorizedStates.length > 0) {
+          const filteredRevokedUsers = revokedUsersData!.filter(ru => ru.state && authorizedStates.includes(ru.state));
+          setRevokedUsers(filteredRevokedUsers || []);
+      } else {
+          setRevokedUsers(revokedUsersData || []);
+      }
 
     } catch (error) {
       console.error("Error loading user data:", error);
@@ -74,7 +106,6 @@ const UserListPage = () => {
       const revokedEmailsSet = new Set(revokedUsers.map(u => u.email));
       const combinedData: any[] = [];
 
-      // Add onboarded users
       users.forEach(u => {
         combinedData.push({
           "Status": revokedEmailsSet.has(u.email) ? "Revoked" : "Onboarded",
@@ -90,7 +121,6 @@ const UserListPage = () => {
         });
       });
 
-      // Add staged users not yet onboarded or revoked
       stagedUsers.forEach(su => {
         if (!users.some(u => u.email === su.email) && !revokedEmailsSet.has(su.email)) {
           combinedData.push({
@@ -102,13 +132,12 @@ const UserListPage = () => {
             "Designation": su.designation || '',
             "Region": su.region || '',
             "State": su.state || '',
-            "Joined At": '', // Staged users don't have a joined date in `users` table
+            "Joined At": '',
             "Last Updated At": '',
           });
         }
       });
 
-      // Add explicitly revoked users (these should override other statuses for reporting revoked status)
       revokedUsers.forEach(ru => {
         combinedData.push({
           "Status": "Revoked",
@@ -119,8 +148,8 @@ const UserListPage = () => {
           "Designation": ru.designation || '',
           "Region": ru.region || '',
           "State": ru.state || '',
-          "Joined At": '', // Revoked users from staging might not have a joined date
-          "Last Updated At": ru.timestamp ? new Date(ru.timestamp).toLocaleDateString() : '', // Use revocation timestamp
+          "Joined At": '',
+          "Last Updated At": ru.timestamp ? new Date(ru.timestamp).toLocaleDateString() : '',
         });
       });
 
@@ -128,7 +157,6 @@ const UserListPage = () => {
       const workbook = XLSX.utils.book_new();
       XLSX.utils.book_append_sheet(workbook, worksheet, 'User Data');
 
-      // Set column widths for better readability
       worksheet['!cols'] = [
         { wch: 15 }, // Status
         { wch: 25 }, // Name
@@ -169,7 +197,7 @@ const UserListPage = () => {
           <div className="yd-container animate-fade-in">
             <div className="flex justify-between items-center mb-6">
               <h2 className="yd-section-title">User Management</h2>
-              <div className="flex gap-2"> {/* Added a div to group buttons */}
+              <div className="flex gap-2">
                 <YDButton onClick={loadData} disabled={isLoading || isDownloading}>
                   {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
                   {isLoading ? "Loading..." : "Refresh Data"}

@@ -12,23 +12,23 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContaine
 import { Loader2, User, ChevronRight, Download } from 'lucide-react';
 import YDButton from '@/components/ui/YDButton';
 import * as XLSX from 'xlsx';
+import { useProfile } from '@/hooks/useProfile'; // Import useProfile
 
 // Types
 type User = Tables<'users'>;
-type Lesson = Tables<'lessons'>; // Added for correct lesson filtering
-
+type Lesson = Tables<'lessons'>;
 type LanguageProgress = {
-  percentage: number; // Lesson completion percentage
-  completed: number; // Lessons completed
-  total: number; // Total lessons available
-  totalQuizzes: number; // Total quizzes available
-  attemptedQuizzes: number; // Quizzes attempted
-  averageScore: number | null; // Average quiz score for attempted quizzes
+  percentage: number;
+  completed: number;
+  total: number;
+  totalQuizzes: number;
+  attemptedQuizzes: number;
+  averageScore: number | null;
 };
 
 type UserOverallProgress = {
   user: User;
-  progress: LanguageProgress; 
+  progress: LanguageProgress;
 };
 
 // Custom Tooltip Component for Chart
@@ -46,47 +46,74 @@ const CustomTooltip = ({ active, payload }: TooltipProps<number, string>) => {
 };
 
 const ProgressReport = () => {
+  const { profile, isLoading: isProfileLoading } = useProfile(); // Get current user's profile
   const [userProgressList, setUserProgressList] = useState<UserOverallProgress[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isDownloading, setIsDownloading] = useState(false); // New state for download button
+  const [isDownloading, setIsDownloading] = useState(false);
 
   useEffect(() => {
+    if (isProfileLoading) {
+        return; // Wait for profile to load
+    }
+
     const fetchAllProgressData = async () => {
       setIsLoading(true);
       try {
-        // Fetch all necessary data in parallel
-        const [
-          { data: usersData, error: usersError },
+        let authorizedStates: string[] = [];
+        if (profile?.role === 'region admin' && profile.id) {
+            const { data: adminStatesData, error: adminStatesError } = await supabase
+                .from('region_admin_state')
+                .select('state')
+                .eq('id', profile.id);
+            if (adminStatesError) throw adminStatesError;
+            authorizedStates = adminStatesData.map(row => row.state);
+        }
+
+        // Fetch users based on role and assigned states
+        let usersQuery = supabase.from('users').select('*');
+        let initialUsersData: User[] = []; // Declare a mutable variable for usersData
+
+        if (profile?.role === 'region admin' && authorizedStates.length > 0) {
+            const { data, error } = await usersQuery.in('state', authorizedStates).order('name');
+            if (error) throw error;
+            initialUsersData = data || [];
+        } else if (profile?.role === 'region admin' && authorizedStates.length === 0) {
+             // If region admin but no states assigned, they see no users.
+            setUserProgressList([]); // Set the final list to empty
+            setIsLoading(false);
+            return;
+        } else { // Admin or other roles, fetch all users
+            const { data, error } = await usersQuery.order('name');
+            if (error) throw error;
+            initialUsersData = data || [];
+        }
+
+        const [ // Use initialUsersData here
           { data: modulesData, error: modulesError },
           { data: designationsData, error: designationsError },
-          // Fetch module_state data instead of module_region
-          { data: statesData, error: statesError }, 
-          { data: lessonsData, error: lessonsError }, // This fetch needs all fields for type Lesson
+          { data: statesData, error: statesError },
+          { data: lessonsData, error: lessonsError },
           { data: progressData, error: progressError },
           { data: quizzesData, error: quizzesError },
           { data: quizResultsData, error: quizResultsError },
         ] = await Promise.all([
-          supabase.from('users').select('*').order('name'),
+          // No need to run usersQuery again, we already have initialUsersData
           supabase.from('modules').select('id, language'),
           supabase.from('module_designation').select('*'),
-          // Fetch module_state data
-          supabase.from('module_state').select('*'), 
-          // FIX: Select all fields for the lessons to match the Lesson type
-          supabase.from('lessons').select('id, module_id, language, content, created_at, duration_minutes, order, title, updated_at, video_url'), 
+          supabase.from('module_state').select('*'),
+          supabase.from('lessons').select('id, module_id, language, content, created_at, duration_minutes, order, title, updated_at, video_url'),
           supabase.from('user_progress').select('user_id, lesson_id').eq('status', 'completed'),
           supabase.from('quizzes').select('id, lesson_id'),
           supabase.from('quiz_results').select('user_id, quiz_id, score, created_at').order('created_at', { ascending: false }),
         ]);
 
-        if (usersError) throw usersError;
+        // Moved usersError handling up where initialUsersData is fetched.
         if (modulesError) throw modulesError;
         if (designationsError) throw designationsError;
-        if (statesError) throw statesError; // Check for error in statesData
+        if (statesError) throw statesError;
         if (lessonsError) throw lessonsError;
         if (progressError) throw progressError;
         if (quizzesError) throw quizzesError;
-        // if (questionsError) throw questionsError; // Not used in this particular report, but good to fetch if used elsewhere.
-        // if (answersError) throw answersError;     // Not used in this particular report.
         if (quizResultsError) throw quizResultsError;
         
         // --- Create Lookup Maps ---
@@ -96,14 +123,13 @@ const ProgressReport = () => {
             designationsMap.get(md.module_id)!.push(md.designation);
         });
 
-        // Use statesMap instead of regionsMap
         const statesMap = new Map<string, string[]>();
         statesData!.forEach(ms => {
             if (!statesMap.has(ms.module_id)) statesMap.set(ms.module_id, []);
             statesMap.get(ms.module_id)!.push(ms.state);
         });
         
-        const lessonsByModule = new Map<string, Lesson[]>(); // Store full lesson objects
+        const lessonsByModule = new Map<string, Lesson[]>();
         lessonsData!.forEach(lesson => {
             if (!lessonsByModule.has(lesson.module_id!)) lessonsByModule.set(lesson.module_id!, []);
             lessonsByModule.get(lesson.module_id!)!.push(lesson);
@@ -126,38 +152,33 @@ const ProgressReport = () => {
             if (!latestQuizScoresByUser.has(result.user_id)) {
                 latestQuizScoresByUser.set(result.user_id, new Map());
             }
-            // Only store the latest score for each quiz (assuming `created_at` ordering handles this)
             if (!latestQuizScoresByUser.get(result.user_id)!.has(result.quiz_id)) {
                 latestQuizScoresByUser.get(result.user_id)!.set(result.quiz_id, result.score);
             }
         });
 
-        // --- Calculate progress for each user based on their preferred language ---
-        const calculatedProgress = usersData!.map(user => {
-            const userPreferredLanguage = user.language || 'english'; // Default to English if not set
+        const calculatedProgress = initialUsersData.map(user => { // Use initialUsersData here
+            const userPreferredLanguage = user.language || 'english';
             const defaultProgress: LanguageProgress = { percentage: 0, completed: 0, total: 0, totalQuizzes: 0, attemptedQuizzes: 0, averageScore: null };
             
             let progressForUser: LanguageProgress = defaultProgress;
 
-            // Filter modules for the user's profile and their preferred language
             const availableModulesForLanguage = modulesData!.filter(module => {
                 if (module.language !== userPreferredLanguage) return false;
-                if (user.role === 'admin') return true;
+                if (profile?.role === 'admin') return true;
 
                 const designations = designationsMap.get(module.id) || [];
-                const states = statesMap.get(module.id) || []; // Use states
+                const states = statesMap.get(module.id) || [];
                 
                 const isDesignationRestricted = designations.length > 0;
-                const isStateRestricted = states.length > 0; // Use state restriction
+                const isStateRestricted = states.length > 0;
 
-                // If a module has no restrictions, it is NOT shown to non-admins
-                if (!isDesignationRestricted && !isStateRestricted && user.role !== 'admin') {
+                if (!isDesignationRestricted && !isStateRestricted && profile?.role !== 'admin') {
                     return false; 
                 }
 
-                // If it is restricted, the user must match all active restrictions.
                 const userMatchesDesignation = !isDesignationRestricted || (!!user.designation && designations.includes(user.designation));
-                const userMatchesState = !isStateRestricted || (!!user.state && states.includes(user.state)); // Check user's state
+                const userMatchesState = !isStateRestricted || (!!user.state && states.includes(user.state));
 
                 return userMatchesDesignation && userMatchesState;
             });
@@ -165,8 +186,7 @@ const ProgressReport = () => {
             const availableLessonIdsForLanguage = new Set<string>();
             availableModulesForLanguage.forEach(module => {
                 (lessonsByModule.get(module.id) || []).forEach(lesson => {
-                    // Ensure the lesson itself is also in the preferred language
-                    if (lesson.language === userPreferredLanguage) { // <-- This ensures lessons match user's preferred language
+                    if (lesson.language === userPreferredLanguage) {
                         availableLessonIdsForLanguage.add(lesson.id);
                     }
                 });
@@ -218,8 +238,8 @@ const ProgressReport = () => {
     };
 
     fetchAllProgressData();
-  }, []);
-  
+  }, [profile, isProfileLoading]); // Re-run when profile changes
+
   const handleDownloadReport = () => {
     if (userProgressList.length === 0) {
       toast({ title: "No Data", description: "There is no progress data to download.", variant: "destructive"});
@@ -230,8 +250,7 @@ const ProgressReport = () => {
 
     try {
         const dataForExcel = userProgressList.flatMap(({ user, progress }) => {
-            // Only include progress if there are completed lessons in their preferred language
-            if (progress.total === 0 && progress.totalQuizzes === 0) return null; // Only show users with some activity
+            if (progress.total === 0 && progress.totalQuizzes === 0) return null;
 
             const quizAttemptProgress = progress.totalQuizzes > 0 ? Math.round((progress.attemptedQuizzes / progress.totalQuizzes) * 100) : 0;
             
@@ -240,9 +259,9 @@ const ProgressReport = () => {
                 "Email": user.email,
                 "PSL ID": user.psl_id || 'N/A',
                 "Role": user.role || 'N/A',
-                "Region": user.region || 'N/A', // Keep region for now, as it's in user profile
-                "State": user.state || 'N/A', // Added State
-                "Preferred Language": user.language || 'english', // Explicitly show preferred language
+                "Region": user.region || 'N/A',
+                "State": user.state || 'N/A',
+                "Preferred Language": user.language || 'english',
                 "Total Lessons (Preferred Lang)": progress.total,
                 "Lessons Completed (Preferred Lang)": progress.completed,
                 "Lesson Progress (%) (Preferred Lang)": progress.percentage,

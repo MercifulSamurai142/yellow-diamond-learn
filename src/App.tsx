@@ -26,8 +26,10 @@ import { LanguageProvider, useLanguage, Language } from "./contexts/LanguageCont
 import ProtectedRoute from "./components/ProtectedRoute";
 import ProgressReport from "./pages/admin/ProgressReport";
 import ProgressDetail from "./pages/admin/ProgressDetail";
+import RegionAdminsPage from "./pages/admin/RegionAdminsPage"; // Import the new wrapper page
 import { useEffect } from "react";
 import { useProfile } from "./hooks/useProfile"; // Import useProfile
+
 
 // Create a single, stable QueryClient instance outside the component
 const queryClient = new QueryClient({
@@ -51,6 +53,7 @@ const AppContent = () => {
       setLanguage(profile.language as Language);
     }
   }, [profile, isProfileLoading, currentLanguage, setLanguage]);
+
 
   return (
     <Routes>
@@ -139,6 +142,12 @@ const AppContent = () => {
       <Route path="/admin/progress-report/:userId" element={
         <ProtectedRoute requiredRole="admin">
           <ProgressDetail />
+        </ProtectedRoute>
+      } />
+      {/* New route for RegionAdminManager, using the wrapper page */}
+      <Route path="/admin/region-admins" element={
+        <ProtectedRoute requiredRole="admin">
+          <RegionAdminsPage />
         </ProtectedRoute>
       } />
 

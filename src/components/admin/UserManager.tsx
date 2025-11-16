@@ -362,6 +362,7 @@ const UserManager = ({ users, stagedUsers, revokedUsers, onUsersUpdate, refreshD
                                 {user.status === 'revoked' ? 'Revoked' : user.isRevoked ? 'Revoked' : user.status}
                             </span>
                            {user.designation && <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800">{user.designation}</span>}
+                           {user.state && <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800">{user.state}</span>}
                         </div>
                       </>
                     )}
