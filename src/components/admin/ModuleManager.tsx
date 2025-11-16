@@ -23,7 +23,55 @@ interface ModuleManagerProps {
   refreshData: () => Promise<void>;
 }
 
-const REGION_OPTIONS = ["North", "South", "East", "West", "Central"];
+const STATE_OPTIONS_CENTRAL = [
+  "Chhattisgarh",
+  "MP-1",
+  "MP-2",
+  "Nagpur",
+];
+
+const STATE_OPTIONS_EAST = [
+  "Arunachal Pradesh",
+  "Assam",
+  "Bihar",
+  "Jharkhand",
+  "Manipur",
+  "Meghalaya",
+  "Mizoram",
+  "Nagaland",
+  "Odisha",
+  "Tripura",
+  "West Bengal",
+];
+
+const STATE_OPTIONS_NORTH = [
+  "Delhi & NCR",
+  "Eastern UP",
+  "Haryana",
+  "Himachal Pradesh",
+  "Jammu Kashmir",
+  "Punjab",
+  "Rajasthan",
+  "Uttarakhand",
+  "West UP",
+];
+
+const STATE_OPTIONS_SOUTH = [
+  "Andhra Pradesh",
+  "Bangalore",
+  "Karnataka",
+  "Kerala",
+  "Tamilnadu",
+  "Telangana",
+];
+
+const STATE_OPTIONS_WEST = [
+  "Gujarat - Avadh",
+  "Mumbai",
+  "Pune",
+  "Rest of Maharashtra",
+];
+
 
 const ModuleManager = ({ modules, moduleDesignations, moduleRegions, englishModules, onModulesUpdate, refreshData }: ModuleManagerProps) => {
   const [isAddingModule, setIsAddingModule] = useState(false);
@@ -38,7 +86,7 @@ const ModuleManager = ({ modules, moduleDesignations, moduleRegions, englishModu
   });
   const [designations, setDesignations] = useState<string[]>([]);
   const [designationInput, setDesignationInput] = useState("");
-  const [regions, setRegions] = useState<string[]>([]);
+  const [states, setStates] = useState<string[]>([]); // Changed from regions to states
   const [videoFile, setVideoFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
   const [availableVideos, setAvailableVideos] = useState<{ name: string }[]>([]);
@@ -79,16 +127,27 @@ const ModuleManager = ({ modules, moduleDesignations, moduleRegions, englishModu
     setDesignations(designations.filter(d => d !== designationToRemove));
   };
   
-  const handleRegionChange = (region: string, checked: boolean) => {
-    setRegions(prev => checked ? [...prev, region] : prev.filter(r => r !== region));
+  // Renamed to handleStateChange
+  const handleStateChange = (state: string, checked: boolean) => {
+    setStates(prev => checked ? [...prev, state] : prev.filter(s => s !== state));
+  };
+
+  // New handler for "Select All"
+  const handleSelectAllStates = (stateOptions: string[], checked: boolean) => {
+    if (checked) {
+      setStates(prev => Array.from(new Set([...prev, ...stateOptions])));
+    } else {
+      setStates(prev => prev.filter(s => !stateOptions.includes(s)));
+    }
   };
 
   const saveModuleDependencies = async (moduleId: string) => {
     const { error: deleteDesignationError } = await supabase.from('module_designation').delete().eq('module_id', moduleId);
     if (deleteDesignationError) throw deleteDesignationError;
     
-    const { error: deleteRegionError } = await supabase.from('module_region').delete().eq('module_id', moduleId);
-    if (deleteRegionError) throw deleteRegionError;
+    // Changed to module_state
+    const { error: deleteStateError } = await supabase.from('module_state').delete().eq('module_id', moduleId);
+    if (deleteStateError) throw deleteStateError;
 
     if (designations.length > 0) {
       const designationInserts = designations.map(d => ({ module_id: moduleId, designation: d }));
@@ -96,10 +155,11 @@ const ModuleManager = ({ modules, moduleDesignations, moduleRegions, englishModu
       if (insertDesignationError) throw insertDesignationError;
     }
 
-    if (regions.length > 0) {
-      const regionInserts = regions.map(r => ({ module_id: moduleId, region: r }));
-      const { error: insertRegionError } = await supabase.from('module_region').insert(regionInserts);
-      if (insertRegionError) throw insertRegionError;
+    // Changed to module_state
+    if (states.length > 0) {
+      const stateInserts = states.map(s => ({ module_id: moduleId, state: s }));
+      const { error: insertStateError } = await supabase.from('module_state').insert(stateInserts);
+      if (insertStateError) throw insertStateError;
     }
   };
 
@@ -168,8 +228,15 @@ const ModuleManager = ({ modules, moduleDesignations, moduleRegions, englishModu
     const currentDesignations = moduleDesignations.filter(md => md.module_id === moduleId).map(md => md.designation);
     setDesignations(currentDesignations);
 
-    const currentRegions = moduleRegions.filter(mr => mr.module_id === moduleId).map(mr => mr.region);
-    setRegions(currentRegions);
+    // Changed to module_state
+    const { data: moduleStates, error: stateError } = await supabase.from('module_state').select('state').eq('module_id', moduleId);
+    if (stateError) {
+        console.error("Error fetching module states:", stateError);
+        toast({ variant: 'destructive', title: 'Error', description: 'Failed to load module states.' });
+        setStates([]);
+    } else {
+        setStates(moduleStates?.map(ms => ms.state) || []);
+    }
     
     setIsAddingModule(true);
     fetchAvailableVideos(moduleId);
@@ -222,9 +289,9 @@ const ModuleManager = ({ modules, moduleDesignations, moduleRegions, englishModu
 
   const handleDeleteModule = async (moduleId: string) => {
     try {
-      // Delete associated module_designation and module_region records first due to foreign key constraints
+      // Delete associated module_designation and module_state records first due to foreign key constraints
       await supabase.from('module_designation').delete().eq('module_id', moduleId);
-      await supabase.from('module_region').delete().eq('module_id', moduleId);
+      await supabase.from('module_state').delete().eq('module_id', moduleId); // Changed to module_state
 
       // Attempt to delete associated video from storage bucket
       try {
@@ -283,7 +350,7 @@ const ModuleManager = ({ modules, moduleDesignations, moduleRegions, englishModu
     });
     setDesignations([]);
     setDesignationInput("");
-    setRegions([]);
+    setStates([]); // Changed from regions to states
     setVideoFile(null);
     setIsUploading(false);
     setReferenceSearchQuery('');
@@ -422,20 +489,130 @@ const ModuleManager = ({ modules, moduleDesignations, moduleRegions, englishModu
                 </div>
             </div>
 
-            {/* Regions Input */}
+            {/* States Input - Changed from Regions */}
             <div>
-                <Label>Module Regions</Label>
-                <div className="grid grid-cols-3 gap-2 p-2 border rounded-md mt-1">
-                    {REGION_OPTIONS.map(region => (
-                        <div key={region} className="flex items-center space-x-2">
-                            <Checkbox 
-                                id={`region-${region}`} 
-                                checked={regions.includes(region)} 
-                                onCheckedChange={(checked) => handleRegionChange(region, !!checked)}
-                            />
-                            <Label htmlFor={`region-${region}`} className="text-sm font-normal">{region}</Label>
+                <Label className="mb-2">Module States</Label>
+                <div className="space-y-4 p-2 border rounded-md">
+                    <div>
+                        <div className="flex justify-between items-center mb-2">
+                            <h5 className="font-medium text-sm">Central</h5>
+                            <YDButton 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => handleSelectAllStates(STATE_OPTIONS_CENTRAL, !STATE_OPTIONS_CENTRAL.every(state => states.includes(state)))}
+                            >
+                                {STATE_OPTIONS_CENTRAL.every(state => states.includes(state)) ? "Unselect All" : "Select All"}
+                            </YDButton>
                         </div>
-                    ))}
+                        <div className="grid grid-cols-2 gap-2">
+                            {STATE_OPTIONS_CENTRAL.map(stateOption => (
+                                <div key={stateOption} className="flex items-center space-x-2">
+                                    <Checkbox 
+                                        id={`state-${stateOption}`} 
+                                        checked={states.includes(stateOption)} 
+                                        onCheckedChange={(checked) => handleStateChange(stateOption, !!checked)}
+                                    />
+                                    <Label htmlFor={`state-${stateOption}`} className="text-sm font-normal">{stateOption}</Label>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    <div>
+                        <div className="flex justify-between items-center mb-2">
+                            <h5 className="font-medium text-sm">East</h5>
+                            <YDButton 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => handleSelectAllStates(STATE_OPTIONS_EAST, !STATE_OPTIONS_EAST.every(state => states.includes(state)))}
+                            >
+                                {STATE_OPTIONS_EAST.every(state => states.includes(state)) ? "Unselect All" : "Select All"}
+                            </YDButton>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                            {STATE_OPTIONS_EAST.map(stateOption => (
+                                <div key={stateOption} className="flex items-center space-x-2">
+                                    <Checkbox 
+                                        id={`state-${stateOption}`} 
+                                        checked={states.includes(stateOption)} 
+                                        onCheckedChange={(checked) => handleStateChange(stateOption, !!checked)}
+                                    />
+                                    <Label htmlFor={`state-${stateOption}`} className="text-sm font-normal">{stateOption}</Label>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    <div>
+                        <div className="flex justify-between items-center mb-2">
+                            <h5 className="font-medium text-sm">North</h5>
+                            <YDButton 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => handleSelectAllStates(STATE_OPTIONS_NORTH, !STATE_OPTIONS_NORTH.every(state => states.includes(state)))}
+                            >
+                                {STATE_OPTIONS_NORTH.every(state => states.includes(state)) ? "Unselect All" : "Select All"}
+                            </YDButton>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                            {STATE_OPTIONS_NORTH.map(stateOption => (
+                                <div key={stateOption} className="flex items-center space-x-2">
+                                    <Checkbox 
+                                        id={`state-${stateOption}`} 
+                                        checked={states.includes(stateOption)} 
+                                        onCheckedChange={(checked) => handleStateChange(stateOption, !!checked)}
+                                    />
+                                    <Label htmlFor={`state-${stateOption}`} className="text-sm font-normal">{stateOption}</Label>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    <div>
+                        <div className="flex justify-between items-center mb-2">
+                            <h5 className="font-medium text-sm">South</h5>
+                            <YDButton 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => handleSelectAllStates(STATE_OPTIONS_SOUTH, !STATE_OPTIONS_SOUTH.every(state => states.includes(state)))}
+                            >
+                                {STATE_OPTIONS_SOUTH.every(state => states.includes(state)) ? "Unselect All" : "Select All"}
+                            </YDButton>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                            {STATE_OPTIONS_SOUTH.map(stateOption => (
+                                <div key={stateOption} className="flex items-center space-x-2">
+                                    <Checkbox 
+                                        id={`state-${stateOption}`} 
+                                        checked={states.includes(stateOption)} 
+                                        onCheckedChange={(checked) => handleStateChange(stateOption, !!checked)}
+                                    />
+                                    <Label htmlFor={`state-${stateOption}`} className="text-sm font-normal">{stateOption}</Label>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
+                    <div>
+                        <div className="flex justify-between items-center mb-2">
+                            <h5 className="font-medium text-sm">West</h5>
+                            <YDButton 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={() => handleSelectAllStates(STATE_OPTIONS_WEST, !STATE_OPTIONS_WEST.every(state => states.includes(state)))}
+                            >
+                                {STATE_OPTIONS_WEST.every(state => states.includes(state)) ? "Unselect All" : "Select All"}
+                            </YDButton>
+                        </div>
+                        <div className="grid grid-cols-2 gap-2">
+                            {STATE_OPTIONS_WEST.map(stateOption => (
+                                <div key={stateOption} className="flex items-center space-x-2">
+                                    <Checkbox 
+                                        id={`state-${stateOption}`} 
+                                        checked={states.includes(stateOption)} 
+                                        onCheckedChange={(checked) => handleStateChange(stateOption, !!checked)}
+                                    />
+                                    <Label htmlFor={`state-${stateOption}`} className="text-sm font-normal">{stateOption}</Label>
+                                </div>
+                            ))}
+                        </div>
+                    </div>
                 </div>
             </div>
 

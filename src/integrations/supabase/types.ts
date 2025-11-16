@@ -236,6 +236,29 @@ export type Database = {
           }
         ]
       }
+      module_state: {
+        Row: {
+          module_id: string
+          state: string
+        }
+        Insert: {
+          module_id: string
+          state: string
+        }
+        Update: {
+          module_id?: string
+          state?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "module_state_module_id_fkey"
+            columns: ["module_id"]
+            isOneToOne: false
+            referencedRelation: "modules"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       modules_completed: {
         Row: {
           id: string
@@ -387,6 +410,29 @@ export type Database = {
           },
         ]
       }
+      region_admin_state: { // Added table
+        Row: {
+          id: string; // Foreign key to public.users.id
+          state: string;
+        }
+        Insert: {
+          id: string;
+          state: string;
+        }
+        Update: {
+          id?: string;
+          state?: string;
+        }
+        Relationships: [
+          {
+            foreignKeyName: "region_admin_state_id_fkey"
+            columns: ["id"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
       revoked_users: {
         Row: {
           email: string
@@ -477,7 +523,6 @@ export type Database = {
         }
         Update: {
           completed_at?: string | null
-          created_at?: string | null
           id?: string
           lesson_id?: string | null
           status?: string

@@ -10,6 +10,7 @@ import ModuleManager from "@/components/admin/ModuleManager";
 import LessonManager from "@/components/admin/LessonManager";
 import QuizManager from "@/components/admin/QuizManager";
 import AnnouncementManager from "@/components/admin/AnnouncementManager";
+import RegionAdminManager from "@/components/admin/RegionAdminManager"; // Import the new manager
 import { Tables } from "@/integrations/supabase/types";
 import { useAuth } from "@/contexts/AuthContext";
 import { useProfile } from "@/hooks/useProfile";
@@ -41,6 +42,7 @@ const Admin = () => {
   const [moduleDesignations, setModuleDesignations] = useState<ModuleDesignation[]>([]);
   const [moduleRegions, setModuleRegions] = useState<ModuleRegion[]>([]);
   const [allEnglishModules, setAllEnglishModules] = useState<Module[]>([]); // New state for English modules
+  // Removed regionAdmins state and its updater as RegionAdminManager will manage its own state.
 
   useEffect(() => {
     if (profile) {
@@ -117,8 +119,10 @@ const Admin = () => {
         .select("*")
         .eq("language", "english")
         .order("name");
+      if (engModulesData) setAllEnglishModules(engModulesData);
       if (engModulesError) throw engModulesError;
-      setAllEnglishModules(engModulesData || []);
+
+      // No longer fetching region admins here, RegionAdminManager will fetch its own.
 
 
     } catch (error) {
@@ -148,11 +152,14 @@ const Admin = () => {
               </div>
               
               <Tabs defaultValue="modules" onValueChange={setActiveTab}>
-                <TabsList className="mb-6 w-full grid grid-cols-4">
+                <TabsList className="mb-6 w-full grid grid-cols-5"> {/* Increased grid cols */}
                   <TabsTrigger value="modules">Modules</TabsTrigger>
                   <TabsTrigger value="lessons">Lessons</TabsTrigger>
                   <TabsTrigger value="quizzes">Quizzes</TabsTrigger>
                   <TabsTrigger value="announcements">Announcements</TabsTrigger>
+                  {profile?.role === 'admin' && ( // Conditionally render tab for admin role
+                    <TabsTrigger value="regionAdmins">Region Admins</TabsTrigger>
+                  )}
                 </TabsList>
                 
                 <TabsContent value="modules" className="space-y-4">
@@ -191,6 +198,15 @@ const Admin = () => {
                     refreshData={loadData}
                   />
                 </TabsContent>
+
+                {profile?.role === 'admin' && ( // Conditionally render content for admin role
+                  <TabsContent value="regionAdmins" className="space-y-4">
+                    <RegionAdminManager
+                      // RegionAdminManager will manage its own state internally
+                      // No need to pass regionAdmins or onRegionAdminsUpdate from here
+                    />
+                  </TabsContent>
+                )}
               </Tabs>
             </div>
           </main>

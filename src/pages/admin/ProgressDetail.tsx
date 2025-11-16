@@ -1,5 +1,6 @@
+// yellow-diamond-learn-dev/src/pages/admin/ProgressDetail.tsx
 import { useState, useEffect } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { Tables, Json } from '@/integrations/supabase/types'; // Import Json type
@@ -56,6 +57,7 @@ const ProgressDetail = () => {
   const [userLanguageModulesProgress, setUserLanguageModulesProgress] = useState<UserLanguageModuleDetails[]>([]);
   const [userQuizAttempts, setUserQuizAttempts] = useState<UserQuizAttemptDetail[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const navigate = useNavigate();
 
   useEffect(() => {
     if (!userId) {
@@ -78,7 +80,8 @@ const ProgressDetail = () => {
         const [
             { data: allModulesData, error: modulesError },
             { data: allDesignationsData, error: designationsError },
-            { data: allRegionsData, error: regionsError },
+            // Fetch module_state data instead of module_region
+            { data: allStatesData, error: statesError }, 
             { data: allLessonsData, error: lessonsError },
             { data: allUserProgressData, error: progressError },
             { data: allQuizzesData, error: quizzesError },
@@ -88,7 +91,8 @@ const ProgressDetail = () => {
         ] = await Promise.all([
             supabase.from('modules').select('*'),
             supabase.from('module_designation').select('*'),
-            supabase.from('module_region').select('*'),
+            // Fetch module_state data
+            supabase.from('module_state').select('*'), 
             supabase.from('lessons').select('*'),
             supabase.from('user_progress').select('lesson_id, completed_at').eq('user_id', userId).eq('status', 'completed'),
             supabase.from('quizzes').select('*'),
@@ -99,7 +103,7 @@ const ProgressDetail = () => {
         
         if(modulesError) throw modulesError;
         if(designationsError) throw designationsError;
-        if(regionsError) throw regionsError;
+        if(statesError) throw statesError; // Check for error in statesData
         if(lessonsError) throw lessonsError;
         if(progressError) throw progressError;
         if(quizzesError) throw quizzesError;
@@ -128,10 +132,11 @@ const ProgressDetail = () => {
             designationsLookup.get(md.module_id)!.push(md.designation);
         });
         
-        const regionsLookup = new Map<string, string[]>();
-        allRegionsData!.forEach(mr => {
-            if (!regionsLookup.has(mr.module_id)) regionsLookup.set(mr.module_id, []);
-            regionsLookup.get(mr.module_id)!.push(mr.region);
+        // Use statesLookup instead of regionsLookup
+        const statesLookup = new Map<string, string[]>();
+        allStatesData!.forEach(ms => {
+            if (!statesLookup.has(ms.module_id)) statesLookup.set(ms.module_id, []);
+            statesLookup.get(ms.module_id)!.push(ms.state);
         });
         
         const preferredLanguageModules = allModulesData!.filter(module => {
@@ -139,18 +144,18 @@ const ProgressDetail = () => {
             if (userData.role === 'admin') return true;
 
             const designations = designationsLookup.get(module.id) || [];
-            const regions = regionsLookup.get(module.id) || [];
+            const states = statesLookup.get(module.id) || []; // Use states
             const isDesignationRestricted = designations.length > 0;
-            const isRegionRestricted = regions.length > 0;
+            const isStateRestricted = states.length > 0; // Use state restriction
 
-            if (!isDesignationRestricted && !isRegionRestricted && userData.role !== 'admin') {
+            if (!isDesignationRestricted && !isStateRestricted && userData.role !== 'admin') {
                 return false;
             }
 
             const userMatchesDesignation = !isDesignationRestricted || (!!userData.designation && designations.includes(userData.designation));
-            const userMatchesRegion = !isRegionRestricted || (!!userData.region && regions.includes(userData.region));
+            const userMatchesState = !isStateRestricted || (!!userData.state && states.includes(userData.state)); // Check user's state
 
-            return userMatchesDesignation && userMatchesRegion;
+            return userMatchesDesignation && userMatchesState;
         });
         
         const languageTabModulesDetails = preferredLanguageModules.map(module => {

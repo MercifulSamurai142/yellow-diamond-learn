@@ -1,4 +1,4 @@
-// yellow-diamond-learn-main/src/pages/modules/Modules.tsx
+// yellow-diamond-learn-dev/src/pages/modules/Modules.tsx
 import { useEffect, useState, useContext } from "react"; // Import useContext
 import { Link } from "react-router-dom";
 import Header from "@/components/layout/Header";
@@ -19,11 +19,32 @@ type Module = {
   updated_at: string | null;
 };
 
+// Translation object structure
+const translations = {
+  english: {
+    module: "Module",
+    noModulesAvailable: "No modules available for your profile in the selected language.",
+  },
+  hindi: {
+    module: "मॉड्यूल",
+    noModulesAvailable: "चयनित भाषा के लिए कोई मॉड्यूल उपलब्ध नहीं है।",
+  },
+  kannada: {
+    module: "ಮಾಡ್ಯೂಲ್",
+    noModulesAvailable: "ಆಯ್ಕೆಮಾಡಿದ ಭಾಷೆಗಾಗಿ ಯಾವುದೇ ಮಾಡ್ಯೂಲ್‌ಗಳು ಲಭ್ಯವಿಲ್ಲ.",
+  }
+};
+
+
 const Modules = () => {
   const [modules, setModules] = useState<Module[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const { currentLanguage } = useContext(LanguageContext)!; // Get currentLanguage from context
   const { profile, isLoading: isProfileLoading } = useProfile();
+
+  // Get current language translations
+  const t = translations[currentLanguage] || translations.english; // Initialize t here
+
 
   useEffect(() => {
     if (isProfileLoading || !profile) {
@@ -34,24 +55,61 @@ const Modules = () => {
     const fetchModules = async () => {
       try {
         setIsLoading(true);
-        // Filter modules by currentLanguage
-        const { data: modulesData, error } = await supabase
+        
+        let modulesQuery = supabase
           .from('modules')
           .select('*')
           .eq('language', currentLanguage) // Apply language filter
           .order('order');
+        
+        let initialModulesData: Module[] | null = null;
+        let authorizedStates: string[] = [];
 
-        if (error) throw error;
+        if (profile.role === 'admin') {
+            const { data, error } = await modulesQuery;
+            if (error) throw error;
+            initialModulesData = data;
+        } else if (profile.role === 'region admin' && profile.id) {
+            const { data: adminStatesData, error: adminStatesError } = await supabase
+                .from('region_admin_state')
+                .select('state')
+                .eq('id', profile.id);
+            if (adminStatesError) throw adminStatesError;
+            authorizedStates = adminStatesData.map(row => row.state);
 
-        if (!modulesData) {
-            setModules([]);
-            setIsLoading(false);
-            return;
-        }
+            if (authorizedStates.length === 0) {
+                // If region admin has no states assigned, they see no modules.
+                setModules([]);
+                setIsLoading(false);
+                return;
+            }
 
-        let filteredModules = modulesData;
+            // Now get modules that match these states
+            const { data: allModulesForLanguage, error: modulesError } = await modulesQuery;
+            if (modulesError) throw modulesError;
+            
+            const { data: moduleStates, error: stateError } = await supabase.from('module_state').select('module_id, state');
+            if (stateError) throw stateError;
+            const statesMap = new Map<string, string[]>();
+            for (const ms of moduleStates) {
+                if (!statesMap.has(ms.module_id)) statesMap.set(ms.module_id, []);
+                statesMap.get(ms.module_id)!.push(ms.state);
+            }
 
-        if (profile.role !== 'admin') {
+            initialModulesData = (allModulesForLanguage || []).filter(module => {
+                const moduleStates = statesMap.get(module.id) || [];
+                const isModuleStateRestricted = moduleStates.length > 0;
+
+                if (!isModuleStateRestricted) {
+                    return false; // Modules with no state restriction are not shown to region admins
+                }
+                return moduleStates.some(ms => authorizedStates.includes(ms));
+            });
+
+        } else { // Learner role
+            const { data: allModulesForLanguage, error: modulesError } = await modulesQuery;
+            if (modulesError) throw modulesError;
+
             const { data: moduleDesignations, error: desError } = await supabase.from('module_designation').select('module_id, designation');
             if (desError) throw desError;
             const designationsMap = new Map<string, string[]>();
@@ -60,38 +118,36 @@ const Modules = () => {
                 designationsMap.get(md.module_id)!.push(md.designation);
             }
 
-            const { data: moduleRegions, error: regError } = await supabase.from('module_region').select('module_id, region');
-            if (regError) throw regError;
-            const regionsMap = new Map<string, string[]>();
-            for (const mr of moduleRegions) {
-                if (!regionsMap.has(mr.module_id)) regionsMap.set(mr.module_id, []);
-                regionsMap.get(mr.module_id)!.push(mr.region);
+            const { data: moduleStates, error: stateError } = await supabase.from('module_state').select('module_id, state');
+            if (stateError) throw stateError;
+            const statesMap = new Map<string, string[]>();
+            for (const ms of moduleStates) {
+                if (!statesMap.has(ms.module_id)) statesMap.set(ms.module_id, []);
+                statesMap.get(ms.module_id)!.push(ms.state);
             }
 
             const userDesignation = profile.designation;
-            const userRegion = profile.region;
+            const userState = profile.state;
 
-            filteredModules = modulesData.filter(module => {
+            initialModulesData = (allModulesForLanguage || []).filter(module => {
                 const designations = designationsMap.get(module.id) || [];
-                const regions = regionsMap.get(module.id) || [];
-
+                const states = statesMap.get(module.id) || [];
+                
                 const isDesignationRestricted = designations.length > 0;
-                const isRegionRestricted = regions.length > 0;
+                const isStateRestricted = states.length > 0;
 
-                // If a module has no restrictions, it is NOT shown.
-                if (!isDesignationRestricted && !isRegionRestricted) {
-                    return false;
+                if (!isDesignationRestricted && !isStateRestricted) {
+                    return false; 
                 }
                 
-                // If it is restricted, the user must match all active restrictions.
                 const userMatchesDesignation = !isDesignationRestricted || (!!userDesignation && designations.includes(userDesignation));
-                const userMatchesRegion = !isRegionRestricted || (!!userRegion && regions.includes(userRegion));
+                const userMatchesState = !isStateRestricted || (!!userState && states.includes(userState));
 
-                return userMatchesDesignation && userMatchesRegion;
+                return userMatchesDesignation && userMatchesState;
             });
         }
         
-        setModules(filteredModules || []);
+        setModules(initialModulesData || []);
       } catch (error) {
         console.error('Error fetching modules:', error);
       } finally {
@@ -100,7 +156,7 @@ const Modules = () => {
     };
 
     fetchModules();
-  }, [currentLanguage, profile, isProfileLoading]); // Re-run effect when currentLanguage changes
+  }, [currentLanguage, profile, isProfileLoading]);
 
   return (
     <div className="flex h-screen bg-background">
@@ -121,7 +177,7 @@ const Modules = () => {
                   <div className="md:col-span-3 lg:col-span-3">
                     <YDCard>
                       <div className="p-6 text-center">
-                        <p className="text-muted-foreground">No modules available for your profile in the selected language.</p>
+                        <p className="text-muted-foreground">{t.noModulesAvailable}</p>
                       </div>
                     </YDCard>
                   </div>
@@ -137,7 +193,7 @@ const Modules = () => {
                             "flex items-center text-sm",
                             module.order === 1 ? "text-primary-foreground/80" : "text-muted-foreground"
                           )}>
-                            <span>Module {module.order}</span>
+                            <span>{t.module} {module.order}</span>
                           </div>
                           <h3 className={cn(
                             "text-xl font-semibold mb-2",

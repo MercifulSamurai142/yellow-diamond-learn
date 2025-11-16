@@ -47,7 +47,6 @@ export const ProgressProvider: React.FC<{ children: ReactNode }> = ({ children }
 
   const fetchProgressData = async () => {
     if (!user || !profile || isProfileLoading) {
-        // If no user or profile, reset to default and stop loading
         setProgressStats(defaultProgressStats);
         setIsLoading(false);
         return;
@@ -55,18 +54,56 @@ export const ProgressProvider: React.FC<{ children: ReactNode }> = ({ children }
     try {
       setIsLoading(true);
 
-      // Fetch modules for the current language
-      const { data: modulesData, error: modulesError } = await supabase
+      let modulesQuery = supabase
         .from('modules')
-        .select('id, order')
-        .eq('language', currentLanguage); // Filter by language
+        .select('id, order, language')
+        .eq('language', currentLanguage);
 
+      let authorizedStates: string[] = [];
+      if (profile.role === 'region admin' && profile.id) {
+          const { data: adminStatesData, error: adminStatesError } = await supabase
+              .from('region_admin_state')
+              .select('state')
+              .eq('id', profile.id);
+          if (adminStatesError) throw adminStatesError;
+          authorizedStates = adminStatesData.map(row => row.state);
+
+          if (authorizedStates.length === 0) {
+              setProgressStats(defaultProgressStats);
+              setIsLoading(false);
+              return;
+          }
+      }
+
+      const { data: modulesData, error: modulesError } = await modulesQuery;
       if (modulesError) throw modulesError;
       if (!modulesData) throw new Error("No modules found");
       
       let filteredModules = modulesData;
 
-      if (profile.role !== 'admin') {
+      if (profile.role === 'admin') {
+          // Admin sees all modules for the selected language
+      } else if (profile.role === 'region admin') {
+          // Region admin sees modules mapped to their assigned states
+          const { data: moduleStates, error: stateError } = await supabase.from('module_state').select('module_id, state');
+          if (stateError) throw stateError;
+          const statesMap = new Map<string, string[]>();
+          for (const ms of moduleStates) {
+              if (!statesMap.has(ms.module_id)) statesMap.set(ms.module_id, []);
+              statesMap.get(ms.module_id)!.push(ms.state);
+          }
+
+          filteredModules = filteredModules.filter(module => {
+              const moduleStates = statesMap.get(module.id) || [];
+              const isModuleStateRestricted = moduleStates.length > 0;
+
+              if (!isModuleStateRestricted) {
+                  return false; // Modules with no state restriction are not shown to region admins
+              }
+              return moduleStates.some(ms => authorizedStates.includes(ms));
+          });
+
+      } else { // Learner role
           const moduleIds = modulesData.map(m => m.id);
           if(moduleIds.length === 0) {
               filteredModules = [];
@@ -79,31 +116,31 @@ export const ProgressProvider: React.FC<{ children: ReactNode }> = ({ children }
                   designationsMap.get(md.module_id)!.push(md.designation);
               }
 
-              const { data: moduleRegions, error: regError } = await supabase.from('module_region').select('module_id, region').in('module_id', moduleIds);
-              if (regError) throw regError;
-              const regionsMap = new Map<string, string[]>();
-              for (const mr of moduleRegions) {
-                  if (!regionsMap.has(mr.module_id)) regionsMap.set(mr.module_id, []);
-                  regionsMap.get(mr.module_id)!.push(mr.region);
+              const { data: moduleStates, error: stateError } = await supabase.from('module_state').select('module_id, state').in('module_id', moduleIds);
+              if (stateError) throw stateError;
+              const statesMap = new Map<string, string[]>();
+              for (const ms of moduleStates) {
+                  if (!statesMap.has(ms.module_id)) statesMap.set(ms.module_id, []);
+                  statesMap.get(ms.module_id)!.push(ms.state);
               }
 
               const userDesignation = profile.designation;
-              const userRegion = profile.region;
+              const userState = profile.state;
 
               filteredModules = modulesData.filter(module => {
                   const designations = designationsMap.get(module.id) || [];
-                  const regions = regionsMap.get(module.id) || [];
+                  const states = statesMap.get(module.id) || [];
                   const isDesignationRestricted = designations.length > 0;
-                  const isRegionRestricted = regions.length > 0;
+                  const isStateRestricted = states.length > 0;
 
-                  if (!isDesignationRestricted && !isRegionRestricted) {
+                  if (!isDesignationRestricted && !isStateRestricted && profile.role !== 'admin') {
                       return false;
                   }
 
                   const userMatchesDesignation = !isDesignationRestricted || (!!userDesignation && designations.includes(userDesignation));
-                  const userMatchesRegion = !isRegionRestricted || (!!userRegion && regions.includes(userRegion));
+                  const userMatchesState = !isStateRestricted || (!!userState && states.includes(userState));
 
-                  return userMatchesDesignation && userMatchesRegion;
+                  return userMatchesDesignation && userMatchesState;
               });
           }
       }
@@ -120,7 +157,8 @@ export const ProgressProvider: React.FC<{ children: ReactNode }> = ({ children }
       const { data: allLessonsData, error: allLessonsError } = await supabase
         .from('lessons')
         .select('id, module_id')
-        .in('module_id', filteredModuleIds);
+        .in('module_id', filteredModuleIds)
+        .eq('language', currentLanguage); // Filter lessons by current language
 
       if (allLessonsError) throw allLessonsError;
       if (!allLessonsData) throw new Error("No lessons found");
