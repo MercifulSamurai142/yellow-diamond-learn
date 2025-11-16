@@ -3,7 +3,7 @@ import { useEffect, useState, useContext } from "react";
 import Header from "@/components/layout/Header";
 import Sidebar from "@/components/layout/Sidebar";
 import { YDCard } from "@/components/ui/YDCard";
-import { BookOpen, BarChart3, PieChart, LucideIcon, Loader2, CheckCircle } from "lucide-react";
+import { BookOpen, BarChart3, PieChart, LucideIcon, Loader2, CheckCircle, HelpCircle } from "lucide-react"; // Added HelpCircle for quiz status
 import { supabase } from "@/integrations/supabase/client";
 import { useAuth } from "@/contexts/AuthContext";
 import { Progress } from "@/components/ui/progress";
@@ -12,23 +12,23 @@ import { toast } from "@/hooks/use-toast";
 import { LanguageContext } from "@/contexts/LanguageContext";
 import YDButton from "@/components/ui/YDButton";
 import { useProfile } from "@/hooks/useProfile";
+import { Tables } from "@/integrations/supabase/types";
 
+// Adjusted ModuleProgress type to correctly reflect calculated fields
 type ModuleProgress = {
   id: string;
   name: string;
   order: number;
+  description: string | null; // Added description for clarity if needed in map
   total_lessons: number;
   completed_lessons: number;
-  percentage: number;
-  quiz_score: number | null;
-  last_activity: string | null;
+  percentage: number; // Lesson completion percentage for this module
+  quiz_score: number | null; // Average quiz score for this module
+  last_activity: string | null; // Keep if actually used, otherwise remove
   hasCertificate: boolean;
+  total_quizzes_in_module: number;
+  attempted_quizzes_in_module: number;
 };
-
-interface QuizResult {
-  quiz_id: string;
-  score: number;
-}
 
 // Custom Tooltip Component for Chart
 const CustomTooltip = ({ active, payload }: TooltipProps<number, string>) => {
@@ -46,7 +46,10 @@ const CustomTooltip = ({ active, payload }: TooltipProps<number, string>) => {
 
 const ProgressPage = () => {
   const [modulesProgress, setModulesProgress] = useState<ModuleProgress[]>([]);
-  const [overallProgress, setOverallProgress] = useState<number>(0);
+  const [overallLessonProgress, setOverallLessonProgress] = useState<number>(0); // Renamed for clarity
+  const [overallQuizProgress, setOverallQuizProgress] = useState<number>(0); // New: Overall quiz progress
+  const [totalAttemptedQuizzes, setTotalAttemptedQuizzes] = useState<number>(0); // New: Total attempted quizzes
+  const [totalAvailableQuizzes, setTotalAvailableQuizzes] = useState<number>(0); // New: Total available quizzes
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const { user } = useAuth();
   const { profile, isLoading: isProfileLoading } = useProfile();
@@ -59,6 +62,8 @@ const ProgressPage = () => {
       yourLearningProgress: "Your Learning Progress",
       trackPerformance: "Track your performance across all modules and lessons",
       overallCourseProgress: "Overall Course Progress",
+      overallQuizProgress: "Overall Quiz Progress", // New
+      quizzesAttempted: "Quizzes Attempted", // New
       modulesCompletedIn: "modules completed in",
       moduleCompletionProgress: "Module Completion Progress",
       quizPerformanceByModule: "Quiz Performance by Module",
@@ -69,12 +74,15 @@ const ProgressPage = () => {
       pleaseRefresh: "Please try refreshing the page",
       getCertificate: "Get Certificate",
       certificateClaimed: "Certificate Claimed",
-      moduleComplete: "Module Complete!"
+      moduleComplete: "Module Complete!",
+      of: "of" // New: for "X of Y quizzes"
     },
     hindi: {
       yourLearningProgress: "आपकी सीखने की प्रगति",
       trackPerformance: "सभी मॉड्यूल और पाठों में अपने प्रदर्शन को ट्रैक करें",
       overallCourseProgress: "समग्र पाठ्यक्रम प्रगति",
+      overallQuizProgress: "समग्र क्विज प्रगति", // New
+      quizzesAttempted: "क्विज का प्रयास किया गया", // New
       modulesCompletedIn: "मॉड्यूल पूरे किए गए",
       moduleCompletionProgress: "मॉड्यूल पूर्णता प्रगति",
       quizPerformanceByModule: "मॉड्यूल द्वारा क्विज प्रदर्शन",
@@ -85,12 +93,15 @@ const ProgressPage = () => {
       pleaseRefresh: "कृपया पृष्ठ को ताज़ा करने का प्रयास करें",
       getCertificate: "प्रमाणपत्र प्राप्त करें",
       certificateClaimed: "प्रमाणपत्र का दावा किया गया",
-      moduleComplete: "मॉड्यूल पूरा हुआ!"
+      moduleComplete: "मॉड्यूल पूरा हुआ!",
+      of: "में से" // New
     },
     kannada: {
       yourLearningProgress: "ನಿಮ್ಮ ಕಲಿಕೆಯ ಪ್ರಗತಿ",
       trackPerformance: "ಎಲ್ಲಾ ಮಾಡ್ಯೂಲ್‌ಗಳು ಮತ್ತು ಪಾಠಗಳಾದ್ಯಂತ ನಿಮ್ಮ ಕಾರ್ಯಕ್ಷಮತೆಯನ್ನು ಟ್ರ್ಯಾಕ್ ಮಾಡಿ",
       overallCourseProgress: "ಒಟ್ಟಾರೆ ಕೋರ್ಸ್ ಪ್ರಗತಿ",
+      overallQuizProgress: "ಒಟ್ಟಾರೆ ರಸಪ್ರಶ್ನೆ ಪ್ರಗತಿ", // New
+      quizzesAttempted: "ರಸಪ್ರಶ್ನೆಗಳಿಗೆ ಪ್ರಯತ್ನಿಸಲಾಗಿದೆ", // New
       modulesCompletedIn: "ಮಾಡ್ಯೂಲ್‌ಗಳು ಪೂರ್ಣಗೊಂಡಿವೆ",
       moduleCompletionProgress: "ಮಾಡ್ಯೂಲ್ ಪೂರ್ಣಗೊಳಿಸುವಿಕೆ ಪ್ರಗತಿ",
       quizPerformanceByModule: "ಮಾಡ್ಯೂಲ್ ಮೂಲಕ ರಸಪ್ರಶ್ನೆ ಕಾರ್ಯಕ್ಷಮತೆ",
@@ -101,7 +112,8 @@ const ProgressPage = () => {
       pleaseRefresh: "ದಯವಿಟ್ಟು ಪುಟವನ್ನು ರಿಫ್ರೆಶ್ ಮಾಡಲು ಪ್ರಯತ್ನಿಸಿ",
       getCertificate: "ಪ್ರಮಾಣಪತ್ರ ಪಡೆಯಿರಿ",
       certificateClaimed: "ಪ್ರಮಾಣಪತ್ರವನ್ನು ಕ್ಲೈಮ್ ಮಾಡಲಾಗಿದೆ",
-      moduleComplete: "ಮಾಡ್ಯೂಲ್ ಪೂರ್ಣಗೊಂಡಿದೆ!"
+      moduleComplete: "ಮಾಡ್ಯೂಲ್ ಪೂರ್ಣಗೊಂಡಿದೆ!",
+      of: "ರಲ್ಲಿ" // New
     }
   };
 
@@ -159,7 +171,10 @@ const ProgressPage = () => {
         if (!user || !profile || isProfileLoading) {
             setIsLoading(false);
             setModulesProgress([]);
-            setOverallProgress(0);
+            setOverallLessonProgress(0);
+            setOverallQuizProgress(0);
+            setTotalAttemptedQuizzes(0);
+            setTotalAvailableQuizzes(0);
             return;
         }
 
@@ -167,71 +182,103 @@ const ProgressPage = () => {
             setIsLoading(true);
 
             // Fetch modules and their lessons for the current language
-            const { data: modulesData, error: modulesError } = await supabase
+            // The `select` query now explicitly includes nested `lessons` and `quizzes`
+            const { data: modulesDataWithLessonsAndQuizzes, error: modulesError } = await supabase
                 .from('modules')
-                .select('id, name, order, description, lessons(id, quizzes(id))')
+                .select('id, name, order, description, language, lessons(id, language, quizzes(id))')
                 .eq('language', currentLanguage)
                 .order('order');
 
             if (modulesError) throw modulesError;
-            if (!modulesData || modulesData.length === 0) {
+            if (!modulesDataWithLessonsAndQuizzes || modulesDataWithLessonsAndQuizzes.length === 0) {
                 setModulesProgress([]);
-                setOverallProgress(0);
+                setOverallLessonProgress(0);
+                setOverallQuizProgress(0);
+                setTotalAttemptedQuizzes(0);
+                setTotalAvailableQuizzes(0);
                 setIsLoading(false);
                 return;
             }
             
-            let filteredModules = modulesData;
+            // Filtering modules based on user role and assigned states/designations
+            let filteredModules = modulesDataWithLessonsAndQuizzes;
 
-            if (profile.role !== 'admin') {
-                const moduleIds = modulesData.map(m => m.id);
-                 if(moduleIds.length === 0) {
-                    filteredModules = [];
-                } else {
-                    const { data: moduleDesignations, error: desError } = await supabase.from('module_designation').select('module_id, designation').in('module_id', moduleIds);
-                    if (desError) throw desError;
-                    const designationsMap = new Map<string, string[]>();
-                    for (const md of moduleDesignations) {
-                        if (!designationsMap.has(md.module_id)) designationsMap.set(md.module_id, []);
-                        designationsMap.get(md.module_id)!.push(md.designation);
-                    }
+            let authorizedStates: string[] = [];
+            if (profile.role === 'region admin' && profile.id) {
+                const { data: adminStatesData, error: adminStatesError } = await supabase
+                    .from('region_admin_state')
+                    .select('state')
+                    .eq('id', profile.id);
+                if (adminStatesError) throw adminStatesError;
+                authorizedStates = adminStatesData.map(row => row.state);
 
-                    // Fetch module_state data
-                    const { data: moduleStates, error: stateError } = await supabase.from('module_state').select('module_id, state').in('module_id', moduleIds);
-                    if (stateError) throw stateError;
-                    const statesMap = new Map<string, string[]>();
-                    for (const ms of moduleStates) {
-                        if (!statesMap.has(ms.module_id)) statesMap.set(ms.module_id, []);
-                        statesMap.get(ms.module_id)!.push(ms.state);
-                    }
-
-                    const userDesignation = profile.designation;
-                    const userState = profile.state; // Use user's state
-
-                    filteredModules = modulesData.filter(module => {
-                        const designations = designationsMap.get(module.id) || [];
-                        const states = statesMap.get(module.id) || []; // Use states
-                        const isDesignationRestricted = designations.length > 0;
-                        const isStateRestricted = states.length > 0; // Use state restriction
-
-                        if (!isDesignationRestricted && !isStateRestricted) {
-                            return false; 
-                        }
-
-                        const userMatchesDesignation = !isDesignationRestricted || (!!userDesignation && designations.includes(userDesignation));
-                        const userMatchesState = !isStateRestricted || (!!userState && states.includes(userState)); // Check user's state
-
-                        return userMatchesDesignation && userMatchesState;
-                    });
+                if (authorizedStates.length === 0) {
+                    setModulesProgress([]);
+                    setOverallLessonProgress(0);
+                    setOverallQuizProgress(0);
+                    setTotalAttemptedQuizzes(0);
+                    setTotalAvailableQuizzes(0);
+                    setIsLoading(false);
+                    return;
                 }
             }
 
-            if (filteredModules.length === 0) {
-              setModulesProgress([]);
-              setOverallProgress(0);
-              setIsLoading(false);
-              return;
+
+            if (profile.role === 'admin') {
+                // Admin sees all modules for the selected language, no further filtering needed here.
+            } else if (profile.role === 'region admin') {
+                const { data: moduleStates, error: stateError } = await supabase.from('module_state').select('module_id, state');
+                if (stateError) throw stateError;
+                const statesMap = new Map<string, string[]>();
+                moduleStates.forEach(ms => {
+                    if (!statesMap.has(ms.module_id)) statesMap.set(ms.module_id, []);
+                    statesMap.get(ms.module_id)!.push(ms.state);
+                });
+
+                filteredModules = filteredModules.filter(module => {
+                    const moduleStates = statesMap.get(module.id) || [];
+                    const isModuleStateRestricted = moduleStates.length > 0;
+                    if (!isModuleStateRestricted) return false;
+                    return moduleStates.some(ms => authorizedStates.includes(ms));
+                });
+
+            } else { // Learner role
+                const moduleIds = modulesDataWithLessonsAndQuizzes.map(m => m.id);
+                const { data: moduleDesignations, error: desError } = await supabase.from('module_designation').select('module_id, designation').in('module_id', moduleIds);
+                if (desError) throw desError;
+                const designationsMap = new Map<string, string[]>();
+                moduleDesignations.forEach(md => {
+                    if (!designationsMap.has(md.module_id)) designationsMap.set(md.module_id, []);
+                    designationsMap.get(md.module_id)!.push(md.designation);
+                });
+
+                const { data: moduleStates, error: stateError } = await supabase.from('module_state').select('module_id, state').in('module_id', moduleIds);
+                if (stateError) throw stateError;
+                const statesMap = new Map<string, string[]>();
+                moduleStates.forEach(ms => {
+                    if (!statesMap.has(ms.module_id)) statesMap.set(ms.module_id, []);
+                    statesMap.get(ms.module_id)!.push(ms.state);
+                });
+
+                const userDesignation = profile.designation;
+                const userState = profile.state;
+
+                filteredModules = modulesDataWithLessonsAndQuizzes.filter(module => {
+                    const designations = designationsMap.get(module.id) || [];
+                    const states = statesMap.get(module.id) || [];
+                    const isDesignationRestricted = designations.length > 0;
+                    const isStateRestricted = states.length > 0;
+
+                    if (!isDesignationRestricted && !isStateRestricted && profile.role !== 'admin') {
+                        return false;
+                    }
+                    const userMatchesDesignation = !isDesignationRestricted || (!!userDesignation && designations.includes(userDesignation));
+                    const userMatchesState = !isStateRestricted || (!!userState && states.includes(userState));
+                    return userMatchesDesignation && userMatchesState;
+                });
             }
+
+            const finalModuleIds = filteredModules.map(m => m.id);
 
             // Fetch all of the user's completed lessons at once
             const { data: progressData, error: progressError } = await supabase
@@ -252,14 +299,20 @@ const ProgressPage = () => {
             if (completedModulesError) throw completedModulesError;
             const completedModuleIds = new Set(completedModulesData.map(c => c.module_id));
 
-            // Aggregate all quiz IDs from all modules to fetch scores in one call
-            const allQuizIds = filteredModules.flatMap(module =>
-                module.lessons.flatMap(lesson =>
-                    lesson.quizzes.map(quiz => quiz.id)
-                )
-            );
-
+            let allQuizIds: string[] = [];
             let quizScoresByQuizId = new Map<string, number>();
+            let attemptedQuizCount = 0;
+
+            // Collect all quiz IDs from filtered modules and lessons
+            filteredModules.forEach(module => {
+                // Ensure lessons are filtered by language as well, even if module.language is already filtered
+                (module.lessons || []).filter(lesson => lesson.language === currentLanguage).forEach(lesson => {
+                    (lesson.quizzes || []).forEach(quiz => {
+                        allQuizIds.push(quiz.id);
+                    });
+                });
+            });
+
             if (allQuizIds.length > 0) {
                 const { data: resultsData, error: resultsError } = await supabase
                     .from('quiz_results')
@@ -272,52 +325,74 @@ const ProgressPage = () => {
                     console.error("Error fetching quiz results directly:", resultsError);
                     toast({ variant: 'destructive', title: 'Error', description: 'Could not load quiz scores.' });
                 } else if (resultsData) {
-                    // Process results to get only the latest score for each quiz
+                    const uniqueAttemptedQuizzes = new Set<string>();
                     resultsData.forEach(result => {
                         if (!quizScoresByQuizId.has(result.quiz_id)) {
                             quizScoresByQuizId.set(result.quiz_id, result.score);
+                            uniqueAttemptedQuizzes.add(result.quiz_id);
                         }
                     });
+                    attemptedQuizCount = uniqueAttemptedQuizzes.size;
                 }
             }
             
-            // Now, process each module with all data already fetched
+            // Now, process each filtered module to build ModuleProgress type
             const moduleProgressResults = filteredModules.map((module) => {
-                const totalLessons = module.lessons.length;
-                const completedLessons = module.lessons.filter(l => completedLessonIds.has(l.id)).length;
+                // Filter lessons by language if not already done by Supabase RLS policies
+                const lessonsInModule = (module.lessons || []).filter(lesson => lesson.language === currentLanguage);
+
+                const totalLessons = lessonsInModule.length;
+                const completedLessons = lessonsInModule.filter(l => completedLessonIds.has(l.id)).length;
                 const percentage = totalLessons > 0 ? Math.round((completedLessons / totalLessons) * 100) : 0;
                 
-                const quizIdsInModule = module.lessons.flatMap(l => l.quizzes.map(q => q.id));
+                const quizIdsInModule = lessonsInModule.flatMap(l => l.quizzes.map(q => q.id));
                 const scoresInModule = quizIdsInModule
                     .map(quizId => quizScoresByQuizId.get(quizId))
                     .filter((score): score is number => score !== undefined);
                 
-                let quizScore = null;
+                let moduleAvgQuizScore = null;
                 if (scoresInModule.length > 0) {
                     const totalScore = scoresInModule.reduce((sum, score) => sum + score, 0);
-                    quizScore = Math.round(totalScore / scoresInModule.length);
+                    moduleAvgQuizScore = Math.round(totalScore / scoresInModule.length);
                 }
 
                 return {
                     id: module.id,
                     name: module.name,
                     order: module.order,
+                    description: module.description, // Include description
                     total_lessons: totalLessons,
                     completed_lessons: completedLessons,
                     percentage,
-                    quiz_score: quizScore,
-                    last_activity: null, // This part can be re-added if needed
+                    quiz_score: moduleAvgQuizScore,
+                    last_activity: null, // As before, needs specific logic if used
                     hasCertificate: completedModuleIds.has(module.id),
+                    total_quizzes_in_module: quizIdsInModule.length,
+                    attempted_quizzes_in_module: scoresInModule.length,
                 };
             });
 
             setModulesProgress(moduleProgressResults);
             
+            // Calculate overall lesson progress
             const totalLessonsAll = moduleProgressResults.reduce((sum, module) => sum + module.total_lessons, 0);
             const completedLessonsAll = moduleProgressResults.reduce((sum, module) => sum + module.completed_lessons, 0);
-            const overallPercentage = totalLessonsAll > 0 ? Math.round((completedLessonsAll * 100/ totalLessonsAll) ) : 0;
-            
-            setOverallProgress(overallPercentage);
+            const overallLessonPercentage = totalLessonsAll > 0 ? Math.round((completedLessonsAll * 100/ totalLessonsAll) ) : 0;
+            setOverallLessonProgress(overallLessonPercentage);
+
+            // Calculate overall quiz progress (average of all attempted quiz scores)
+            const totalScoresAllAttemptedQuizzes = Array.from(quizScoresByQuizId.values()); // Get all unique attempted scores
+            let overallAvgQuizScore = 0;
+            if (totalScoresAllAttemptedQuizzes.length > 0) {
+                const sumOfScores = totalScoresAllAttemptedQuizzes.reduce((sum, score) => sum + score, 0);
+                overallAvgQuizScore = Math.round(sumOfScores / totalScoresAllAttemptedQuizzes.length);
+            }
+            setOverallQuizProgress(overallAvgQuizScore);
+
+            // Set total attempted and total available quizzes
+            setTotalAttemptedQuizzes(attemptedQuizCount);
+            setTotalAvailableQuizzes(allQuizIds.length);
+
 
         } catch (error) {
             console.error('Error fetching progress:', error);
@@ -327,7 +402,10 @@ const ProgressPage = () => {
                 description: t.pleaseRefresh
             });
             setModulesProgress([]);
-            setOverallProgress(0);
+            setOverallLessonProgress(0);
+            setOverallQuizProgress(0);
+            setTotalAttemptedQuizzes(0);
+            setTotalAvailableQuizzes(0);
         } finally {
             setIsLoading(false);
         }
@@ -365,23 +443,42 @@ const ProgressPage = () => {
             ) : (
               <>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:col-span-2 gap-4 mb-8">
+                  {/* Overall Course Progress (Lessons) */}
                   <YDCard className="overflow-hidden col-span-1">
                     <div className="p-4">
                       <h3 className="font-medium text-base mb-2">{t.overallCourseProgress}</h3>
                       <div className="flex items-center justify-between mb-2">
-                        <div className="text-3xl font-bold">{overallProgress}%</div>
+                        <div className="text-3xl font-bold">{overallLessonProgress}%</div>
                         <div className="p-2 rounded-full text-primary bg-primary/10">
                           <BookOpen className="h-6 w-6" />
                         </div>
                       </div>
-                      <Progress value={overallProgress} className="h-3" />
+                      <Progress value={overallLessonProgress} className="h-3" />
                       <div className="text-sm text-muted-foreground mt-2">
                         {modulesProgress.filter(m => m.percentage === 100).length} {t.modulesCompletedIn} {modulesProgress.length} {currentLanguage}
                       </div>
                     </div>
                   </YDCard>
+
+                  {/* Overall Quiz Progress */}
+                  <YDCard className="overflow-hidden col-span-1">
+                    <div className="p-4">
+                      <h3 className="font-medium text-base mb-2">{t.overallQuizProgress}</h3>
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="text-3xl font-bold">{overallQuizProgress}%</div>
+                        <div className="p-2 rounded-full text-blue-500 bg-blue-500/10">
+                          <BarChart3 className="h-6 w-6" />
+                        </div>
+                      </div>
+                      <Progress value={overallQuizProgress} className="h-3 bg-blue-200 [&>div]:bg-blue-500" />
+                      <div className="text-sm text-muted-foreground mt-2">
+                          {totalAttemptedQuizzes} {t.of} {totalAvailableQuizzes} {t.quizzesAttempted}
+                      </div>
+                    </div>
+                  </YDCard>
                   
-                  <YDCard>
+                  {/* Quiz Performance by Module Chart */}
+                  <YDCard className="md:col-span-2">
                       <div className="p-4">
                         <div className="flex items-center mb-4">
                           <BarChart3 className="h-5 w-5 mr-2 text-green-500" />
@@ -438,6 +535,11 @@ const ProgressPage = () => {
                                   {module.quiz_score !== null && (
                                       <div className="text-xs text-muted-foreground mt-1">{t.quizScore}: {module.quiz_score}%</div>
                                   )}
+                                  {/* New: Quiz progress for this specific module */}
+                                  <div className="flex items-center text-xs text-muted-foreground mt-1">
+                                    <HelpCircle className="h-3 w-3 mr-1" />
+                                    <span>{module.attempted_quizzes_in_module} {t.of} {module.total_quizzes_in_module} quizzes attempted</span>
+                                  </div>
                               </div>
                            )}
                       </div>
