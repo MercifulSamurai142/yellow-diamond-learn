@@ -7,7 +7,7 @@ import { toast } from "@/hooks/use-toast";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Pencil, Save, User, Search, X, UserX, Loader2, UserCheck } from "lucide-react";
+import { Pencil, Save, User, Search, X, UserX, Loader2, UserCheck, ChevronDown, Download } from "lucide-react";
 import { UserProfile, StagedUser, RevokedUser } from "@/pages/UserListPage";
 import {
   AlertDialog,
@@ -20,6 +20,10 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useProfile } from "@/hooks/useProfile"; // Import useProfile
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from "@/components/ui/command";
+import * as XLSX from 'xlsx'; // Import XLSX
 
 interface UserManagerProps {
   users: UserProfile[];
@@ -27,11 +31,28 @@ interface UserManagerProps {
   revokedUsers: RevokedUser[];
   onUsersUpdate: (users: UserProfile[]) => void;
   refreshData: () => Promise<void>;
+  isLoadingData: boolean; // Prop to indicate initial loading state from parent
 }
 
 const REGION_OPTIONS = ["North", "South", "East", "West", "Central"];
 
-const UserManager = ({ users, stagedUsers, revokedUsers, onUsersUpdate, refreshData }: UserManagerProps) => {
+// Re-using the state options from ModuleManager for consistency
+const STATE_OPTIONS_CENTRAL = ["Chhattisgarh", "MP-1", "MP-2", "Nagpur"];
+const STATE_OPTIONS_EAST = ["Arunachal Pradesh", "Assam", "Bihar", "Jharkhand", "Manipur", "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Tripura", "West Bengal"];
+const STATE_OPTIONS_NORTH = ["Delhi & NCR", "Eastern UP", "Haryana", "Himachal Pradesh", "Jammu Kashmir", "Punjab", "Rajasthan", "Uttarakhand", "West UP"];
+const STATE_OPTIONS_SOUTH = ["Andhra Pradesh", "Bangalore", "Karnataka", "Kerala", "Tamilnadu", "Telangana"];
+const STATE_OPTIONS_WEST = ["Gujarat - Avadh", "Mumbai", "Pune", "Rest of Maharashtra"];
+
+const ALL_STATE_OPTIONS = [
+  ...STATE_OPTIONS_CENTRAL,
+  ...STATE_OPTIONS_EAST,
+  ...STATE_OPTIONS_NORTH,
+  ...STATE_OPTIONS_SOUTH,
+  ...STATE_OPTIONS_WEST,
+];
+
+
+const UserManager = ({ users, stagedUsers, revokedUsers, onUsersUpdate, refreshData, isLoadingData }: UserManagerProps) => {
   const { profile } = useProfile(); // Get current user's profile for role check
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [revokingUser, setRevokingUser] = useState<UserProfile | null>(null);
@@ -48,8 +69,33 @@ const UserManager = ({ users, stagedUsers, revokedUsers, onUsersUpdate, refreshD
   });
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState<'all' | 'onboarded' | 'not onboarded' | 'revoked'>('all');
-  
+  const [selectedStates, setSelectedStates] = useState<string[]>([]); // New state for multi-select state filter
+  const [stateSearchQuery, setStateSearchQuery] = useState('');
+  const [isStateSelectOpen, setIsStateSelectOpen] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false); // Local state for download loading
+
   const revokedEmailsSet = useMemo(() => new Set(revokedUsers.map(u => u.email)), [revokedUsers]);
+
+  const handleStateChange = (state: string, checked: boolean) => {
+    setSelectedStates(prev => 
+      checked ? Array.from(new Set([...prev, state])) : prev.filter(s => s !== state)
+    );
+  };
+  
+  const handleSelectAllStates = () => {
+    const allStateNames = ALL_STATE_OPTIONS.map(s => s);
+    const areAllSelected = allStateNames.every(state => selectedStates.includes(state));
+
+    if (areAllSelected) {
+      setSelectedStates([]);
+    } else {
+      setSelectedStates(allStateNames);
+    }
+  };
+
+  const filteredStates = ALL_STATE_OPTIONS.filter(state => 
+    state.toLowerCase().includes(stateSearchQuery.toLowerCase())
+  );
 
   const combinedAndFilteredUsers = useMemo(() => {
     let combined: any[] = [];
@@ -106,7 +152,7 @@ const UserManager = ({ users, stagedUsers, revokedUsers, onUsersUpdate, refreshD
     // Convert map values to an array for filtering
     combined = Array.from(uniqueEntities.values());
 
-
+    // --- Apply Status Filter ---
     if (filter === 'revoked') {
         combined = combined.filter(u => u.status === 'revoked');
     } else {
@@ -119,7 +165,12 @@ const UserManager = ({ users, stagedUsers, revokedUsers, onUsersUpdate, refreshD
         }
     }
 
-
+    // --- Apply State Filter ---
+    if (selectedStates.length > 0) {
+        combined = combined.filter(u => u.state && selectedStates.includes(u.state));
+    }
+    
+    // --- Apply Search Term Filter ---
     if (!searchTerm) return combined;
 
     const lowerSearch = searchTerm.toLowerCase();
@@ -129,7 +180,64 @@ const UserManager = ({ users, stagedUsers, revokedUsers, onUsersUpdate, refreshD
         (u.role && u.role.toLowerCase().includes(lowerSearch)) ||
         (u.designation && u.designation.toLowerCase().includes(lowerSearch))
     );
-  }, [users, stagedUsers, revokedUsers, filter, searchTerm, revokedEmailsSet]);
+  }, [users, stagedUsers, revokedUsers, filter, searchTerm, revokedEmailsSet, selectedStates]);
+
+  const handleDownloadReport = () => {
+    if (combinedAndFilteredUsers.length === 0) {
+        toast({ title: "No Data", description: "There is no filtered user data to download.", variant: "destructive" });
+        return;
+    }
+
+    setIsDownloading(true);
+
+    try {
+        const dataForExcel = combinedAndFilteredUsers.map(u => ({
+            "Status": u.status === 'revoked' ? 'Revoked' : u.isRevoked ? 'Revoked' : u.status === 'onboarded' ? 'Onboarded' : 'Not Onboarded',
+            "Name": u.name || '',
+            "Email": u.email,
+            "PSL ID": u.psl_id || '',
+            "Role": u.role || '',
+            "Designation": u.designation || '',
+            "Region": u.region || '',
+            "State": u.state || '',
+            "Joined At": u.status === 'onboarded' && u.created_at ? new Date(u.created_at).toLocaleDateString() : '',
+            "Last Updated At": u.status === 'revoked' && u.timestamp ? new Date(u.timestamp).toLocaleDateString() : '',
+        }));
+
+        const worksheet = XLSX.utils.json_to_sheet(dataForExcel);
+        const workbook = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(workbook, worksheet, 'User Data');
+
+        worksheet['!cols'] = [
+            { wch: 15 }, // Status
+            { wch: 25 }, // Name
+            { wch: 30 }, // Email
+            { wch: 15 }, // PSL ID
+            { wch: 15 }, // Role
+            { wch: 20 }, // Designation
+            { wch: 15 }, // Region
+            { wch: 15 }, // State
+            { wch: 18 }, // Joined At
+            { wch: 20 }, // Last Updated At
+        ];
+
+        const today = new Date();
+        const day = String(today.getDate()).padStart(2, '0');
+        const month = String(today.getMonth() + 1).padStart(2, '0');
+        const year = today.getFullYear().toString().slice(-2);
+        const formattedDate = `${day}_${month}_${year}`;
+        
+        XLSX.writeFile(workbook, `User_Data_Report_${formattedDate}_Filtered.xlsx`);
+
+        toast({ title: "Success", description: "Filtered user data downloaded successfully." });
+
+    } catch (error) {
+        toast({ title: "Download Failed", description: "Could not generate the filtered report.", variant: "destructive" });
+        console.error("Excel generation error:", error);
+    } finally {
+        setIsDownloading(false);
+    }
+  };
 
   const handleEditUser = (userId: string) => {
     // Only admins can initiate an edit
@@ -269,6 +377,7 @@ const UserManager = ({ users, stagedUsers, revokedUsers, onUsersUpdate, refreshD
   };
 
   const isAdmin = profile?.role === 'admin';
+  const selectedStateLabel = selectedStates.length === 0 ? "Filter by State" : selectedStates.length === 1 ? selectedStates[0] : `${selectedStates.length} states selected`;
 
   return (
     <div>
@@ -286,15 +395,68 @@ const UserManager = ({ users, stagedUsers, revokedUsers, onUsersUpdate, refreshD
                   <SelectItem value="revoked">Revoked Users</SelectItem>
               </SelectContent>
           </Select>
+
+          {/* State Multi-Select Dropdown Filter */}
+          <Popover open={isStateSelectOpen} onOpenChange={setIsStateSelectOpen}>
+            <PopoverTrigger asChild>
+              <YDButton variant="outline" className="w-[200px] justify-between">
+                {selectedStateLabel}
+                <ChevronDown size={16} className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </YDButton>
+            </PopoverTrigger>
+            <PopoverContent className="w-[200px] p-0" align="start">
+              <Command>
+                <CommandInput placeholder="Search states..." value={stateSearchQuery} onValueChange={setStateSearchQuery} />
+                <CommandList>
+                  <CommandEmpty>No states found.</CommandEmpty>
+                  <CommandItem 
+                    value="Select All/Unselect All" 
+                    onSelect={handleSelectAllStates}
+                    className="flex items-center gap-2 p-2 hover:bg-accent cursor-pointer"
+                  >
+                     <Checkbox checked={ALL_STATE_OPTIONS.every(state => selectedStates.includes(state)) && ALL_STATE_OPTIONS.length > 0} 
+                        onCheckedChange={handleSelectAllStates}
+                     />
+                     Select All/Unselect All
+                  </CommandItem>
+                  {filteredStates.map((state) => (
+                    <CommandItem
+                      key={state}
+                      value={state}
+                      onSelect={() => handleStateChange(state, !selectedStates.includes(state))}
+                      className="flex items-center gap-2 p-2 hover:bg-accent cursor-pointer"
+                    >
+                      <Checkbox
+                        checked={selectedStates.includes(state)}
+                        onCheckedChange={(checked) => handleStateChange(state, !!checked)}
+                      />
+                      {state}
+                    </CommandItem>
+                  ))}
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+          
         </div>
-        <div className="relative w-64">
-          <Input
-            placeholder="Search users..."
-            value={searchTerm}
-            onChange={e => setSearchTerm(e.target.value)}
-            className="pl-9"
-          />
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+        <div className="flex items-center gap-2">
+            <div className="relative w-64">
+              <Input
+                placeholder="Search users..."
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                className="pl-9"
+              />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+            </div>
+            <YDButton onClick={refreshData} disabled={isLoadingData || isDownloading}>
+                  {isLoadingData ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
+                  {isLoadingData ? "Loading..." : "Refresh Data"}
+            </YDButton>
+            <YDButton onClick={handleDownloadReport} disabled={isDownloading || isLoadingData}>
+                  {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Download className="mr-2 h-4 w-4"/>}
+                  {isDownloading ? "Downloading..." : "Download Report"}
+            </YDButton>
         </div>
       </div>
 
@@ -313,9 +475,13 @@ const UserManager = ({ users, stagedUsers, revokedUsers, onUsersUpdate, refreshD
                   <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary flex-shrink-0">
                     {user.profile_picture ? (
                       <img
-                        src={user.profile_picture}
+                        src={
+                          user.profile_picture
+                            ? `${user.profile_picture}${user.updated_at ? `?v=${new Date(user.updated_at).getTime()}` : ''}`
+                            : undefined
+                        }
                         alt={user.name || 'User'}
-                        className="h-10 w-10 rounded-full object-cover"
+                        className="w-full h-full rounded-full object-cover"
                       />
                     ) : (
                       <User size={20} />

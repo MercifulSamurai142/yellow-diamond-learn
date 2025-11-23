@@ -1,5 +1,5 @@
 // yellow-diamond-learn-dev/src/pages/admin/ProgressReport.tsx
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
@@ -9,10 +9,13 @@ import Sidebar from '@/components/layout/Sidebar';
 import { YDCard } from '@/components/ui/YDCard';
 import { Progress } from '@/components/ui/progress';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, TooltipProps } from 'recharts';
-import { Loader2, User, ChevronRight, Download } from 'lucide-react';
+import { Loader2, User, ChevronRight, Download, ChevronDown } from 'lucide-react';
 import YDButton from '@/components/ui/YDButton';
 import * as XLSX from 'xlsx';
 import { useProfile } from '@/hooks/useProfile'; // Import useProfile
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from "@/components/ui/command";
 
 // Types
 type User = Tables<'users'>;
@@ -30,6 +33,21 @@ type UserOverallProgress = {
   user: User;
   progress: LanguageProgress;
 };
+
+// Re-using the state options from ModuleManager for consistency
+const STATE_OPTIONS_CENTRAL = ["Chhattisgarh", "MP-1", "MP-2", "Nagpur"];
+const STATE_OPTIONS_EAST = ["Arunachal Pradesh", "Assam", "Bihar", "Jharkhand", "Manipur", "Meghalaya", "Mizoram", "Nagaland", "Odisha", "Tripura", "West Bengal"];
+const STATE_OPTIONS_NORTH = ["Delhi & NCR", "Eastern UP", "Haryana", "Himachal Pradesh", "Jammu Kashmir", "Punjab", "Rajasthan", "Uttarakhand", "West UP"];
+const STATE_OPTIONS_SOUTH = ["Andhra Pradesh", "Bangalore", "Karnataka", "Kerala", "Tamilnadu", "Telangana"];
+const STATE_OPTIONS_WEST = ["Gujarat - Avadh", "Mumbai", "Pune", "Rest of Maharashtra"];
+
+const ALL_STATE_OPTIONS = [
+  ...STATE_OPTIONS_CENTRAL,
+  ...STATE_OPTIONS_EAST,
+  ...STATE_OPTIONS_NORTH,
+  ...STATE_OPTIONS_SOUTH,
+  ...STATE_OPTIONS_WEST,
+];
 
 // Custom Tooltip Component for Chart
 const CustomTooltip = ({ active, payload }: TooltipProps<number, string>) => {
@@ -50,6 +68,31 @@ const ProgressReport = () => {
   const [userProgressList, setUserProgressList] = useState<UserOverallProgress[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
+  const [selectedStates, setSelectedStates] = useState<string[]>([]); // New state for multi-select state filter
+  const [stateSearchQuery, setStateSearchQuery] = useState('');
+  const [isStateSelectOpen, setIsStateSelectOpen] = useState(false);
+
+  // Memoized filtered state options for the dropdown search
+  const filteredStates = useMemo(() => ALL_STATE_OPTIONS.filter(state => 
+    state.toLowerCase().includes(stateSearchQuery.toLowerCase())
+  ), [stateSearchQuery]);
+
+  const handleStateChange = (state: string, checked: boolean) => {
+    setSelectedStates(prev => 
+      checked ? Array.from(new Set([...prev, state])) : prev.filter(s => s !== state)
+    );
+  };
+
+  const handleSelectAllStates = () => {
+    const allStateNames = ALL_STATE_OPTIONS.map(s => s);
+    const areAllSelected = allStateNames.every(state => selectedStates.includes(state));
+
+    if (areAllSelected) {
+      setSelectedStates([]);
+    } else {
+      setSelectedStates(allStateNames);
+    }
+  };
 
   useEffect(() => {
     if (isProfileLoading) {
@@ -60,26 +103,28 @@ const ProgressReport = () => {
       setIsLoading(true);
       try {
         let authorizedStates: string[] = [];
-        if (profile?.role === 'region admin' && profile.id) {
+        let isRegionAdmin = profile?.role === 'region admin';
+        
+        if (isRegionAdmin && profile!.id) {
             const { data: adminStatesData, error: adminStatesError } = await supabase
                 .from('region_admin_state')
                 .select('state')
-                .eq('id', profile.id);
+                .eq('id', profile!.id);
             if (adminStatesError) throw adminStatesError;
             authorizedStates = adminStatesData.map(row => row.state);
         }
 
-        // Fetch users based on role and assigned states
+        // --- Step 1: Fetch all target users ---
         let usersQuery = supabase.from('users').select('*');
-        let initialUsersData: User[] = []; // Declare a mutable variable for usersData
+        let initialUsersData: User[] = [];
 
-        if (profile?.role === 'region admin' && authorizedStates.length > 0) {
+        if (isRegionAdmin && authorizedStates.length > 0) {
             const { data, error } = await usersQuery.in('state', authorizedStates).order('name');
             if (error) throw error;
             initialUsersData = data || [];
-        } else if (profile?.role === 'region admin' && authorizedStates.length === 0) {
+        } else if (isRegionAdmin && authorizedStates.length === 0) {
              // If region admin but no states assigned, they see no users.
-            setUserProgressList([]); // Set the final list to empty
+            setUserProgressList([]);
             setIsLoading(false);
             return;
         } else { // Admin or other roles, fetch all users
@@ -87,8 +132,21 @@ const ProgressReport = () => {
             if (error) throw error;
             initialUsersData = data || [];
         }
+        
+        // --- Apply State Filter to Users ---
+        let finalUsersData = initialUsersData;
+        if (selectedStates.length > 0) {
+            finalUsersData = initialUsersData.filter(user => user.state && selectedStates.includes(user.state));
+        }
+        // If no users remain after filtering, stop here
+        if (finalUsersData.length === 0) {
+             setUserProgressList([]);
+             setIsLoading(false);
+             return;
+        }
 
-        const [ // Use initialUsersData here
+        // --- Step 2: Fetch all necessary content and progress data ---
+        const [
           { data: modulesData, error: modulesError },
           { data: designationsData, error: designationsError },
           { data: statesData, error: statesError },
@@ -97,7 +155,6 @@ const ProgressReport = () => {
           { data: quizzesData, error: quizzesError },
           { data: quizResultsData, error: quizResultsError },
         ] = await Promise.all([
-          // No need to run usersQuery again, we already have initialUsersData
           supabase.from('modules').select('id, language'),
           supabase.from('module_designation').select('*'),
           supabase.from('module_state').select('*'),
@@ -107,7 +164,6 @@ const ProgressReport = () => {
           supabase.from('quiz_results').select('user_id, quiz_id, score, created_at').order('created_at', { ascending: false }),
         ]);
 
-        // Moved usersError handling up where initialUsersData is fetched.
         if (modulesError) throw modulesError;
         if (designationsError) throw designationsError;
         if (statesError) throw statesError;
@@ -157,7 +213,8 @@ const ProgressReport = () => {
             }
         });
 
-        const calculatedProgress = initialUsersData.map(user => { // Use initialUsersData here
+        // --- Step 3: Calculate Progress for Final Filtered Users ---
+        const calculatedProgress = finalUsersData.map(user => { 
             const userPreferredLanguage = user.language || 'english';
             const defaultProgress: LanguageProgress = { percentage: 0, completed: 0, total: 0, totalQuizzes: 0, attemptedQuizzes: 0, averageScore: null };
             
@@ -232,13 +289,14 @@ const ProgressReport = () => {
           title: "Error",
           description: "Failed to load progress report data.",
         });
+        setUserProgressList([]);
       } finally {
         setIsLoading(false);
       }
     };
 
     fetchAllProgressData();
-  }, [profile, isProfileLoading]); // Re-run when profile changes
+  }, [profile, isProfileLoading, selectedStates]); // Rerun effect when selectedStates changes
 
   const handleDownloadReport = () => {
     if (userProgressList.length === 0) {
@@ -249,6 +307,7 @@ const ProgressReport = () => {
     setIsDownloading(true);
 
     try {
+        // Use userProgressList, which is already filtered by selectedStates
         const dataForExcel = userProgressList.flatMap(({ user, progress }) => {
             if (progress.total === 0 && progress.totalQuizzes === 0) return null;
 
@@ -288,7 +347,7 @@ const ProgressReport = () => {
             { wch: 15 }, // PSL ID
             { wch: 15 }, // Role
             { wch: 15 }, // Region
-            { wch: 15 }, // State (Added column)
+            { wch: 15 }, // State
             { wch: 20 }, // Preferred Language
             { wch: 30 }, // Total Lessons (Preferred Lang)
             { wch: 30 }, // Lessons Completed (Preferred Lang)
@@ -305,7 +364,7 @@ const ProgressReport = () => {
         const year = today.getFullYear().toString().slice(-2);
         const formattedDate = `${day}_${month}_${year}`;
         
-        XLSX.writeFile(workbook, `User_Progress_Report_${formattedDate}.xlsx`);
+        XLSX.writeFile(workbook, `User_Progress_Report_${formattedDate}_Filtered.xlsx`);
 
     } catch (error) {
         toast({ title: "Download Failed", description: "Could not generate the report.", variant: "destructive"});
@@ -314,6 +373,8 @@ const ProgressReport = () => {
         setIsDownloading(false);
     }
   };
+
+  const selectedStateLabel = selectedStates.length === 0 ? "Filter by State" : selectedStates.length === 1 ? selectedStates[0] : `${selectedStates.length} states selected`;
 
   return (
     <div className="flex h-screen bg-background">
@@ -324,11 +385,54 @@ const ProgressReport = () => {
           <div className="yd-container animate-fade-in">
             <div className="flex flex-wrap gap-4 justify-between items-center mb-6">
                 <h2 className="yd-section-title">User Progress Report</h2>
-                <div className="flex-shrink-0">
-                  <YDButton onClick={handleDownloadReport} disabled={isDownloading || isLoading}>
-                      {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Download className="mr-2 h-4 w-4"/>}
-                      Download Full Report
-                  </YDButton>
+                <div className="flex items-center gap-2 flex-shrink-0">
+                    
+                    {/* State Multi-Select Dropdown Filter */}
+                    <Popover open={isStateSelectOpen} onOpenChange={setIsStateSelectOpen}>
+                        <PopoverTrigger asChild>
+                        <YDButton variant="outline" className="w-[200px] justify-between">
+                            {selectedStateLabel}
+                            <ChevronDown size={16} className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </YDButton>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[200px] p-0" align="start">
+                        <Command>
+                            <CommandInput placeholder="Search states..." value={stateSearchQuery} onValueChange={setStateSearchQuery} />
+                            <CommandList>
+                            <CommandEmpty>No states found.</CommandEmpty>
+                            <CommandItem 
+                                value="Select All/Unselect All" 
+                                onSelect={handleSelectAllStates}
+                                className="flex items-center gap-2 p-2 hover:bg-accent cursor-pointer"
+                            >
+                                <Checkbox checked={ALL_STATE_OPTIONS.every(state => selectedStates.includes(state)) && ALL_STATE_OPTIONS.length > 0} 
+                                    onCheckedChange={handleSelectAllStates}
+                                />
+                                Select All/Unselect All
+                            </CommandItem>
+                            {filteredStates.map((state) => (
+                                <CommandItem
+                                key={state}
+                                value={state}
+                                onSelect={() => handleStateChange(state, !selectedStates.includes(state))}
+                                className="flex items-center gap-2 p-2 hover:bg-accent cursor-pointer"
+                                >
+                                <Checkbox
+                                    checked={selectedStates.includes(state)}
+                                    onCheckedChange={(checked) => handleStateChange(state, !!checked)}
+                                />
+                                {state}
+                                </CommandItem>
+                            ))}
+                            </CommandList>
+                        </Command>
+                        </PopoverContent>
+                    </Popover>
+
+                    <YDButton onClick={handleDownloadReport} disabled={isDownloading || isLoading}>
+                        {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Download className="mr-2 h-4 w-4"/>}
+                        Download Filtered Report
+                    </YDButton>
                 </div>
             </div>
             

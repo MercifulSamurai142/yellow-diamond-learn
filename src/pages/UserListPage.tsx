@@ -21,7 +21,7 @@ const UserListPage = () => {
   const [stagedUsers, setStagedUsers] = useState<StagedUser[]>([]);
   const [revokedUsers, setRevokedUsers] = useState<RevokedUser[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isDownloading, setIsDownloading] = useState(false);
+  // Removed [isDownloading, setIsDownloading] state and handleDownloadReport logic from here
 
   useEffect(() => {
     if (isProfileLoading) {
@@ -94,100 +94,6 @@ const UserListPage = () => {
     }
   };
 
-  const handleDownloadReport = () => {
-    if (users.length === 0 && stagedUsers.length === 0 && revokedUsers.length === 0) {
-      toast({ title: "No Data", description: "There is no user data to download.", variant: "destructive" });
-      return;
-    }
-
-    setIsDownloading(true);
-
-    try {
-      const revokedEmailsSet = new Set(revokedUsers.map(u => u.email));
-      const combinedData: any[] = [];
-
-      users.forEach(u => {
-        combinedData.push({
-          "Status": revokedEmailsSet.has(u.email) ? "Revoked" : "Onboarded",
-          "Name": u.name || '',
-          "Email": u.email,
-          "PSL ID": u.psl_id || '',
-          "Role": u.role || '',
-          "Designation": u.designation || '',
-          "Region": u.region || '',
-          "State": u.state || '',
-          "Joined At": u.created_at ? new Date(u.created_at).toLocaleDateString() : '',
-          "Last Updated At": u.updated_at ? new Date(u.updated_at).toLocaleDateString() : '',
-        });
-      });
-
-      stagedUsers.forEach(su => {
-        if (!users.some(u => u.email === su.email) && !revokedEmailsSet.has(su.email)) {
-          combinedData.push({
-            "Status": "Not Onboarded",
-            "Name": su.name || '',
-            "Email": su.email,
-            "PSL ID": su.psl_id || '',
-            "Role": su.role || '',
-            "Designation": su.designation || '',
-            "Region": su.region || '',
-            "State": su.state || '',
-            "Joined At": '',
-            "Last Updated At": '',
-          });
-        }
-      });
-
-      revokedUsers.forEach(ru => {
-        combinedData.push({
-          "Status": "Revoked",
-          "Name": ru.name || '',
-          "Email": ru.email,
-          "PSL ID": ru.psl_id || '',
-          "Role": ru.role || '',
-          "Designation": ru.designation || '',
-          "Region": ru.region || '',
-          "State": ru.state || '',
-          "Joined At": '',
-          "Last Updated At": ru.timestamp ? new Date(ru.timestamp).toLocaleDateString() : '',
-        });
-      });
-
-      const worksheet = XLSX.utils.json_to_sheet(combinedData);
-      const workbook = XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(workbook, worksheet, 'User Data');
-
-      worksheet['!cols'] = [
-        { wch: 15 }, // Status
-        { wch: 25 }, // Name
-        { wch: 30 }, // Email
-        { wch: 15 }, // PSL ID
-        { wch: 15 }, // Role
-        { wch: 20 }, // Designation
-        { wch: 15 }, // Region
-        { wch: 15 }, // State
-        { wch: 18 }, // Joined At
-        { wch: 20 }, // Last Updated At
-      ];
-
-      const today = new Date();
-      const day = String(today.getDate()).padStart(2, '0');
-      const month = String(today.getMonth() + 1).padStart(2, '0');
-      const year = today.getFullYear().toString().slice(-2);
-      const formattedDate = `${day}_${month}_${year}`;
-      
-      XLSX.writeFile(workbook, `User_Data_Report_${formattedDate}.xlsx`);
-
-      toast({ title: "Success", description: "User data downloaded successfully." });
-
-    } catch (error) {
-      toast({ title: "Download Failed", description: "Could not generate the report.", variant: "destructive" });
-      console.error("Excel generation error:", error);
-    } finally {
-      setIsDownloading(false);
-    }
-  };
-
   return (
     <div className="flex h-screen bg-background">
       <Sidebar />
@@ -197,31 +103,19 @@ const UserListPage = () => {
           <div className="yd-container animate-fade-in">
             <div className="flex justify-between items-center mb-6">
               <h2 className="yd-section-title">User Management</h2>
-              <div className="flex gap-2">
-                <YDButton onClick={loadData} disabled={isLoading || isDownloading}>
-                  {isLoading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : null}
-                  {isLoading ? "Loading..." : "Refresh Data"}
-                </YDButton>
-                <YDButton onClick={handleDownloadReport} disabled={isDownloading || isLoading}>
-                  {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Download className="mr-2 h-4 w-4"/>}
-                  {isDownloading ? "Downloading..." : "Download Report"}
-                </YDButton>
-              </div>
+              {/* Download and Refresh buttons are now moved into UserManager.tsx for better filtering control */}
+              {/* The refreshData function is passed down */}
             </div>
             
-            {isLoading ? (
-                <div className="flex items-center justify-center h-64">
-                    <Loader2 className="h-12 w-12 animate-spin text-primary" />
-                </div>
-            ) : (
-              <UserManager 
-                users={users} 
-                stagedUsers={stagedUsers}
-                revokedUsers={revokedUsers}
-                onUsersUpdate={setUsers} 
-                refreshData={loadData} 
-              />
-            )}
+            {/* Pass isLoading to UserManager to handle the loading spinner */}
+            <UserManager 
+              users={users} 
+              stagedUsers={stagedUsers}
+              revokedUsers={revokedUsers}
+              onUsersUpdate={setUsers} 
+              refreshData={loadData} 
+              isLoadingData={isLoading}
+            />
           </div>
         </main>
       </div>
