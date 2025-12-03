@@ -51,6 +51,15 @@ const ALL_STATE_OPTIONS = [
   ...STATE_OPTIONS_WEST,
 ];
 
+// New options definition for Designation Filter
+const DESIGNATION_OPTIONS = [
+  "Sales Officer",
+  "Area Sales Manager",
+  "Regional Sales Manager",
+  "Zonal Sales Manager",
+  "General Manager",
+];
+
 
 const UserManager = ({ users, stagedUsers, revokedUsers, onUsersUpdate, refreshData, isLoadingData }: UserManagerProps) => {
   const { profile } = useProfile(); // Get current user's profile for role check
@@ -69,13 +78,22 @@ const UserManager = ({ users, stagedUsers, revokedUsers, onUsersUpdate, refreshD
   });
   const [searchTerm, setSearchTerm] = useState('');
   const [filter, setFilter] = useState<'all' | 'onboarded' | 'not onboarded' | 'revoked'>('all');
+  
+  // State Filter States
   const [selectedStates, setSelectedStates] = useState<string[]>([]); // New state for multi-select state filter
   const [stateSearchQuery, setStateSearchQuery] = useState('');
   const [isStateSelectOpen, setIsStateSelectOpen] = useState(false);
+  
+  // Designation Filter States (NEW)
+  const [selectedDesignations, setSelectedDesignations] = useState<string[]>([]);
+  const [designationSearchQuery, setDesignationSearchQuery] = useState('');
+  const [isDesignationSelectOpen, setIsDesignationSelectOpen] = useState(false);
+  
   const [isDownloading, setIsDownloading] = useState(false); // Local state for download loading
 
   const revokedEmailsSet = useMemo(() => new Set(revokedUsers.map(u => u.email)), [revokedUsers]);
 
+  // --- State Filter Handlers ---
   const handleStateChange = (state: string, checked: boolean) => {
     setSelectedStates(prev => 
       checked ? Array.from(new Set([...prev, state])) : prev.filter(s => s !== state)
@@ -96,7 +114,30 @@ const UserManager = ({ users, stagedUsers, revokedUsers, onUsersUpdate, refreshD
   const filteredStates = ALL_STATE_OPTIONS.filter(state => 
     state.toLowerCase().includes(stateSearchQuery.toLowerCase())
   );
+  
+  // --- Designation Filter Handlers (NEW) ---
+  const handleDesignationChange = (designation: string, checked: boolean) => {
+    setSelectedDesignations(prev => 
+      checked ? Array.from(new Set([...prev, designation])) : prev.filter(d => d !== designation)
+    );
+  };
 
+  const handleSelectAllDesignations = () => {
+    const allDesignationNames = DESIGNATION_OPTIONS.map(d => d);
+    const areAllSelected = allDesignationNames.every(designation => selectedDesignations.includes(designation));
+
+    if (areAllSelected) {
+      setSelectedDesignations([]);
+    } else {
+      setSelectedDesignations(allDesignationNames);
+    }
+  };
+
+  const filteredDesignations = DESIGNATION_OPTIONS.filter(designation => 
+    designation.toLowerCase().includes(designationSearchQuery.toLowerCase())
+  );
+
+  // --- Filtering Logic ---
   const combinedAndFilteredUsers = useMemo(() => {
     let combined: any[] = [];
 
@@ -170,6 +211,11 @@ const UserManager = ({ users, stagedUsers, revokedUsers, onUsersUpdate, refreshD
         combined = combined.filter(u => u.state && selectedStates.includes(u.state));
     }
     
+    // --- Apply Designation Filter (NEW) ---
+     if (selectedDesignations.length > 0) {
+        combined = combined.filter(u => u.designation && selectedDesignations.includes(u.designation));
+    }
+    
     // --- Apply Search Term Filter ---
     if (!searchTerm) return combined;
 
@@ -180,7 +226,7 @@ const UserManager = ({ users, stagedUsers, revokedUsers, onUsersUpdate, refreshD
         (u.role && u.role.toLowerCase().includes(lowerSearch)) ||
         (u.designation && u.designation.toLowerCase().includes(lowerSearch))
     );
-  }, [users, stagedUsers, revokedUsers, filter, searchTerm, revokedEmailsSet, selectedStates]);
+  }, [users, stagedUsers, revokedUsers, filter, searchTerm, revokedEmailsSet, selectedStates, selectedDesignations]);
 
   const handleDownloadReport = () => {
     if (combinedAndFilteredUsers.length === 0) {
@@ -378,6 +424,7 @@ const UserManager = ({ users, stagedUsers, revokedUsers, onUsersUpdate, refreshD
 
   const isAdmin = profile?.role === 'admin';
   const selectedStateLabel = selectedStates.length === 0 ? "Filter by State" : selectedStates.length === 1 ? selectedStates[0] : `${selectedStates.length} states selected`;
+  const selectedDesignationLabel = selectedDesignations.length === 0 ? "Filter by Designation" : selectedDesignations.length === 1 ? selectedDesignations[0] : `${selectedDesignations.length} designations selected`; // NEW Label
 
   return (
     <div>
@@ -431,6 +478,48 @@ const UserManager = ({ users, stagedUsers, revokedUsers, onUsersUpdate, refreshD
                         onCheckedChange={(checked) => handleStateChange(state, !!checked)}
                       />
                       {state}
+                    </CommandItem>
+                  ))}
+                </CommandList>
+              </Command>
+            </PopoverContent>
+          </Popover>
+          
+          {/* Designation Multi-Select Dropdown Filter (NEW) */}
+          <Popover open={isDesignationSelectOpen} onOpenChange={setIsDesignationSelectOpen}>
+            <PopoverTrigger asChild>
+              <YDButton variant="outline" className="w-[200px] justify-between">
+                {selectedDesignationLabel}
+                <ChevronDown size={16} className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+              </YDButton>
+            </PopoverTrigger>
+            <PopoverContent className="w-[200px] p-0" align="start">
+              <Command>
+                <CommandInput placeholder="Search designations..." value={designationSearchQuery} onValueChange={setDesignationSearchQuery} />
+                <CommandList>
+                  <CommandEmpty>No designations found.</CommandEmpty>
+                  <CommandItem 
+                      value="Select All/Unselect All" 
+                      onSelect={handleSelectAllDesignations}
+                      className="flex items-center gap-2 p-2 hover:bg-accent cursor-pointer"
+                  >
+                      <Checkbox checked={DESIGNATION_OPTIONS.every(designation => selectedDesignations.includes(designation)) && DESIGNATION_OPTIONS.length > 0} 
+                          onCheckedChange={handleSelectAllDesignations}
+                      />
+                      Select All/Unselect All
+                  </CommandItem>
+                  {filteredDesignations.map((designation) => (
+                    <CommandItem
+                      key={designation}
+                      value={designation}
+                      onSelect={() => handleDesignationChange(designation, !selectedDesignations.includes(designation))}
+                      className="flex items-center gap-2 p-2 hover:bg-accent cursor-pointer"
+                    >
+                      <Checkbox
+                        checked={selectedDesignations.includes(designation)}
+                        onCheckedChange={(checked) => handleDesignationChange(designation, !!checked)}
+                      />
+                      {designation}
                     </CommandItem>
                   ))}
                 </CommandList>

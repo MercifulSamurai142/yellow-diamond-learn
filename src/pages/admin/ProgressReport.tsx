@@ -49,6 +49,15 @@ const ALL_STATE_OPTIONS = [
   ...STATE_OPTIONS_WEST,
 ];
 
+// New options definition for Designation Filter
+const DESIGNATION_OPTIONS = [
+  "Sales Officer",
+  "Area Sales Manager",
+  "Regional Sales Manager",
+  "Zonal Sales Manager",
+  "General Manager",
+];
+
 // Custom Tooltip Component for Chart
 const CustomTooltip = ({ active, payload }: TooltipProps<number, string>) => {
     if (active && payload && payload.length) {
@@ -68,14 +77,27 @@ const ProgressReport = () => {
   const [userProgressList, setUserProgressList] = useState<UserOverallProgress[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDownloading, setIsDownloading] = useState(false);
-  const [selectedStates, setSelectedStates] = useState<string[]>([]); // New state for multi-select state filter
+  
+  // State Filter States
+  const [selectedStates, setSelectedStates] = useState<string[]>([]); 
   const [stateSearchQuery, setStateSearchQuery] = useState('');
   const [isStateSelectOpen, setIsStateSelectOpen] = useState(false);
+  
+  // Designation Filter States (NEW)
+  const [selectedDesignations, setSelectedDesignations] = useState<string[]>([]);
+  const [designationSearchQuery, setDesignationSearchQuery] = useState('');
+  const [isDesignationSelectOpen, setIsDesignationSelectOpen] = useState(false);
+
 
   // Memoized filtered state options for the dropdown search
   const filteredStates = useMemo(() => ALL_STATE_OPTIONS.filter(state => 
     state.toLowerCase().includes(stateSearchQuery.toLowerCase())
   ), [stateSearchQuery]);
+  
+  // Memoized filtered designation options (NEW)
+  const filteredDesignations = useMemo(() => DESIGNATION_OPTIONS.filter(designation => 
+    designation.toLowerCase().includes(designationSearchQuery.toLowerCase())
+  ), [designationSearchQuery]);
 
   const handleStateChange = (state: string, checked: boolean) => {
     setSelectedStates(prev => 
@@ -91,6 +113,24 @@ const ProgressReport = () => {
       setSelectedStates([]);
     } else {
       setSelectedStates(allStateNames);
+    }
+  };
+  
+  // New handler for individual designation change
+  const handleDesignationChange = (designation: string, checked: boolean) => {
+    setSelectedDesignations(prev => 
+      checked ? Array.from(new Set([...prev, designation])) : prev.filter(d => d !== designation)
+    );
+  };
+  
+  // New handler for select all/unselect all designations
+  const handleSelectAllDesignations = () => {
+    const areAllSelected = DESIGNATION_OPTIONS.every(designation => selectedDesignations.includes(designation));
+
+    if (areAllSelected) {
+      setSelectedDesignations([]);
+    } else {
+      setSelectedDesignations(DESIGNATION_OPTIONS);
     }
   };
 
@@ -138,6 +178,12 @@ const ProgressReport = () => {
         if (selectedStates.length > 0) {
             finalUsersData = initialUsersData.filter(user => user.state && selectedStates.includes(user.state));
         }
+        
+        // --- Apply Designation Filter to Users (NEW) ---
+        if (selectedDesignations.length > 0) {
+            finalUsersData = finalUsersData.filter(user => user.designation && selectedDesignations.includes(user.designation));
+        }
+        
         // If no users remain after filtering, stop here
         if (finalUsersData.length === 0) {
              setUserProgressList([]);
@@ -296,7 +342,7 @@ const ProgressReport = () => {
     };
 
     fetchAllProgressData();
-  }, [profile, isProfileLoading, selectedStates]); // Rerun effect when selectedStates changes
+  }, [profile, isProfileLoading, selectedStates, selectedDesignations]); // ADDED selectedDesignations
 
   const handleDownloadReport = () => {
     if (userProgressList.length === 0) {
@@ -307,7 +353,7 @@ const ProgressReport = () => {
     setIsDownloading(true);
 
     try {
-        // Use userProgressList, which is already filtered by selectedStates
+        // Use userProgressList, which is already filtered by selectedStates AND selectedDesignations
         const dataForExcel = userProgressList.flatMap(({ user, progress }) => {
             if (progress.total === 0 && progress.totalQuizzes === 0) return null;
 
@@ -318,6 +364,7 @@ const ProgressReport = () => {
                 "Email": user.email,
                 "PSL ID": user.psl_id || 'N/A',
                 "Role": user.role || 'N/A',
+                "Designation": user.designation || 'N/A', // ADDED Designation
                 "Region": user.region || 'N/A',
                 "State": user.state || 'N/A',
                 "Preferred Language": user.language || 'english',
@@ -346,6 +393,7 @@ const ProgressReport = () => {
             { wch: 30 }, // Email
             { wch: 15 }, // PSL ID
             { wch: 15 }, // Role
+            { wch: 20 }, // Designation (NEW)
             { wch: 15 }, // Region
             { wch: 15 }, // State
             { wch: 20 }, // Preferred Language
@@ -375,6 +423,7 @@ const ProgressReport = () => {
   };
 
   const selectedStateLabel = selectedStates.length === 0 ? "Filter by State" : selectedStates.length === 1 ? selectedStates[0] : `${selectedStates.length} states selected`;
+  const selectedDesignationLabel = selectedDesignations.length === 0 ? "Filter by Designation" : selectedDesignations.length === 1 ? selectedDesignations[0] : `${selectedDesignations.length} designations selected`; // NEW Label
 
   return (
     <div className="flex h-screen bg-background">
@@ -429,6 +478,48 @@ const ProgressReport = () => {
                         </PopoverContent>
                     </Popover>
 
+                    {/* Designation Multi-Select Dropdown Filter (NEW) */}
+                    <Popover open={isDesignationSelectOpen} onOpenChange={setIsDesignationSelectOpen}>
+                        <PopoverTrigger asChild>
+                        <YDButton variant="outline" className="w-[200px] justify-between">
+                            {selectedDesignationLabel}
+                            <ChevronDown size={16} className="ml-2 h-4 w-4 shrink-0 opacity-50" />
+                        </YDButton>
+                        </PopoverTrigger>
+                        <PopoverContent className="w-[200px] p-0" align="start">
+                        <Command>
+                            <CommandInput placeholder="Search designations..." value={designationSearchQuery} onValueChange={setDesignationSearchQuery} />
+                            <CommandList>
+                            <CommandEmpty>No designations found.</CommandEmpty>
+                            <CommandItem 
+                                value="Select All/Unselect All" 
+                                onSelect={handleSelectAllDesignations}
+                                className="flex items-center gap-2 p-2 hover:bg-accent cursor-pointer"
+                            >
+                                <Checkbox checked={DESIGNATION_OPTIONS.every(designation => selectedDesignations.includes(designation)) && DESIGNATION_OPTIONS.length > 0} 
+                                    onCheckedChange={handleSelectAllDesignations}
+                                />
+                                Select All/Unselect All
+                            </CommandItem>
+                            {filteredDesignations.map((designation) => (
+                                <CommandItem
+                                key={designation}
+                                value={designation}
+                                onSelect={() => handleDesignationChange(designation, !selectedDesignations.includes(designation))}
+                                className="flex items-center gap-2 p-2 hover:bg-accent cursor-pointer"
+                                >
+                                <Checkbox
+                                    checked={selectedDesignations.includes(designation)}
+                                    onCheckedChange={(checked) => handleDesignationChange(designation, !!checked)}
+                                />
+                                {designation}
+                                </CommandItem>
+                            ))}
+                            </CommandList>
+                        </Command>
+                        </PopoverContent>
+                    </Popover>
+
                     <YDButton onClick={handleDownloadReport} disabled={isDownloading || isLoading}>
                         {isDownloading ? <Loader2 className="mr-2 h-4 w-4 animate-spin"/> : <Download className="mr-2 h-4 w-4"/>}
                         Download Filtered Report
@@ -458,12 +549,15 @@ const ProgressReport = () => {
                                         <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center text-primary flex-shrink-0">
                                             <User size={20} />
                                         </div>
-                                        <div className="w-64 flex-shrink-0"> {/* Fixed width container for text */}
+                                        <div className="w-full flex-shrink-0"> {/* Fixed width container for text */}
                                             <p className="font-medium truncate">{user.name || 'Unnamed User'}</p>
                                             <p className="text-sm text-muted-foreground truncate">{user.email}</p>
-                                            <p className="text-xs px-2 py-1 rounded bg-muted text-muted-foreground capitalize inline-block mt-1">
+                                            <p className="text-xs px-2 py-1 rounded-full bg-muted text-muted-foreground capitalize inline-block mt-1">
                                                 {user.language || 'english'}
                                             </p>
+                                            {user.designation && <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800">{user.designation}</span>}
+                                            {user.state && <span className="text-xs px-2 py-1 rounded-full bg-blue-100 text-blue-800">{user.state}</span>}
+                                            
                                         </div>
                                     </div>
 
