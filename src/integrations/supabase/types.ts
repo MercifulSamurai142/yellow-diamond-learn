@@ -621,6 +621,36 @@ export type Database = {
         }
         Relationships: []
       }
+      user_import_staging_test: {
+        Row: {
+          email: string
+          name: string | null          
+          psl_id: string
+          designation: string | null
+          region: string | null
+          state: string | null
+          role: string | null
+        }
+        Insert: {
+          email?: string | null
+          name?: string | null          
+          psl_id: string
+          designation?: string | null
+          region?: string | null
+          state?: string | null
+          role?: string | null
+        }
+        Update: {
+          email?: string | null
+          name?: string | null          
+          psl_id: string
+          designation?: string | null
+          region?: string | null
+          state?: string | null
+          role?: string | null
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never

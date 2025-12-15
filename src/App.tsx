@@ -27,6 +27,7 @@ import ProtectedRoute from "./components/ProtectedRoute";
 import ProgressReport from "./pages/admin/ProgressReport";
 import ProgressDetail from "./pages/admin/ProgressDetail";
 import RegionAdminsPage from "./pages/admin/RegionAdminsPage"; // Import the new wrapper page
+import BulkUpload from "./pages/admin/BulkUploadPage";
 import { useEffect } from "react";
 import { useProfile } from "./hooks/useProfile"; // Import useProfile
 
@@ -148,6 +149,12 @@ const AppContent = () => {
       <Route path="/admin/region-admins" element={
         <ProtectedRoute requiredRole="admin">
           <RegionAdminsPage />
+        </ProtectedRoute>
+      } />
+
+      <Route path="/admin/bulk-upload" element={
+        <ProtectedRoute requiredRole="admin">
+          <BulkUpload />
         </ProtectedRoute>
       } />
 

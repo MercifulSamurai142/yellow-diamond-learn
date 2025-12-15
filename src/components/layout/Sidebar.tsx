@@ -14,7 +14,8 @@ import {
   Megaphone,
   Users, // Import Users icon
   BarChartHorizontal,
-  MapPin // Import MapPin icon for Region Admins
+  MapPin ,// Import MapPin icon for Region Admins
+  UploadCloud 
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
@@ -51,7 +52,8 @@ const Sidebar = ({ className }: SidebarProps) => {
       logout: "Logout",
       userList: "User List",
       progressReport: "Progress Report",
-      regionAdmins: "Region Admins" // New translation
+      regionAdmins: "Region Admins", // New translation
+      bulkUpload: "Bulk Upload"
     },
     hindi: {
       title: "घोषणाएँ",
@@ -85,7 +87,8 @@ const Sidebar = ({ className }: SidebarProps) => {
       logout: "लॉग आउट",
       userList: "उपयोगकर्ता सूची",
       progressReport: "प्रगति रिपोर्ट",
-      regionAdmins: "क्षेत्रीय एडमिन" // New translation
+      regionAdmins: "क्षेत्रीय एडमिन", // New translation
+      bulkUpload: "Bulk Upload"
     },
     kannada: {
       title: "ಪ್ರಕಟಣೆಗಳು",
@@ -119,7 +122,8 @@ const Sidebar = ({ className }: SidebarProps) => {
       logout: "ಲಾಗ್ ಔಟ್",
       userList: "ಬಳಕೆದಾರರ ಪಟ್ಟಿ",
       progressReport: "ಪ್ರಗತಿ ವರದಿ",
-      regionAdmins: "ಪ್ರಾದೇಶಿಕ ನಿರ್ವಾಹಕರು" // New translation
+      regionAdmins: "ಪ್ರಾದೇಶಿಕ ನಿರ್ವಾಹಕರು", // New translation
+      bulkUpload: "Bulk Upload"
     }
   };
 
@@ -150,6 +154,7 @@ const Sidebar = ({ className }: SidebarProps) => {
     { name: t.userList, icon: <Users size={20} />, path: '/users', roles: ['admin', 'region admin'] },
     { name: t.progressReport, icon: <BarChartHorizontal size={20} />, path: '/progress-report', roles: ['admin', 'region admin'] },
     { name: t.regionAdmins, icon: <MapPin size={20} />, path: '/admin/region-admins', roles: ['admin'] }, // New item for RegionAdminManager
+    { name: t.bulkUpload, icon: <UploadCloud size={20} />, path: '/admin/bulk-upload', roles: ['admin'] }
   ];
 
   const sidebarContent = (
